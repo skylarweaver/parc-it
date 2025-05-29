@@ -3,36 +3,57 @@ import Image from "next/image";
 import { Button } from "../components/ui/button";
 import { LoginModal } from "../components/LoginModal";
 import React from "react";
+import { createClient } from "@supabase/supabase-js";
 
-const MOCK_GROUP_MEMBERS = [
-  // Replace with real group member public keys
-  "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7...",
-];
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function Home() {
   const [loginOpen, setLoginOpen] = React.useState(false);
   const [loginStatus, setLoginStatus] = React.useState<string | null>(null);
   const [loggedIn, setLoggedIn] = React.useState(false);
   const [userPubKey, setUserPubKey] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
 
-  const handleLogin = (key: string, pubKey: string) => {
-    console.log("Derived public key:", pubKey);
-    // For now, check against mock group members
-    const isMember = MOCK_GROUP_MEMBERS.includes(pubKey);
-    if (isMember) {
-      setLoggedIn(true);
-      setUserPubKey(pubKey);
-      setLoginStatus("Login successful! You are recognized as a group member.");
-      setLoginOpen(false);
-      localStorage.setItem("parcItKey", key);
-      localStorage.setItem("parcItPubKey", pubKey);
-      console.log("Login successful. User public key:", pubKey);
-    } else {
-      setLoginStatus("Your key is valid, but you are not a recognized group member.");
+  const handleLogin = async (key: string, pubKey: string) => {
+    setLoading(true);
+    setLoginStatus(null);
+    try {
+      const { data, error } = await supabase
+        .from("group_members")
+        .select("public_key")
+        .eq("public_key", pubKey)
+        .maybeSingle();
+      console.log("Supabase group_members query result:", data, error);
+      if (error) {
+        setLoginStatus("Error checking group membership. Please try again later.");
+        setLoggedIn(false);
+        setUserPubKey(null);
+        setLoading(false);
+        return;
+      }
+      if (data && data.public_key === pubKey) {
+        setLoggedIn(true);
+        setUserPubKey(pubKey);
+        setLoginStatus("Login successful! You are recognized as a group member.");
+        setLoginOpen(false);
+        localStorage.setItem("parcItKey", key);
+        localStorage.setItem("parcItPubKey", pubKey);
+        console.log("Login successful. User public key:", pubKey);
+      } else {
+        setLoginStatus("Your key is valid, but you are not a recognized group member.");
+        setLoggedIn(false);
+        setUserPubKey(null);
+        console.log("Key valid but not a group member:", pubKey);
+      }
+    } catch (e) {
+      setLoginStatus("Unexpected error during login. Please try again.");
       setLoggedIn(false);
       setUserPubKey(null);
-      console.log("Key valid but not a group member:", pubKey);
+      console.error(e);
     }
+    setLoading(false);
   };
 
   return (
@@ -85,8 +106,8 @@ export default function Home() {
           </a>
         </div>
         <div className="mt-8">
-          <Button variant="default" onClick={() => setLoginOpen(true)}>
-            {loggedIn ? "Logged in" : "Login with Parc-It Key"}
+          <Button variant="default" onClick={() => setLoginOpen(true)} disabled={loading}>
+            {loggedIn ? "Logged in" : loading ? "Logging in..." : "Login with Parc-It Key"}
           </Button>
         </div>
         {loginStatus && (
