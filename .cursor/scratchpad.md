@@ -81,6 +81,16 @@ Key differences from double-blind:
    - [ ] On submit, insert a new row into `office_requests` (with dummy signature for now)
    - [ ] Show success/error feedback
 
+8. **UI Overhaul: Retro Layout & Custom Copy**
+   - [ ] Remove all Next.js starter/demo content from the main page
+   - [ ] Formalize the layout to match the retro Windows 95-style mockup:
+     - [ ] Add a title bar/header styled like Windows 95
+     - [ ] Main content area: feed of requests in retro panels
+     - [ ] Sidebar: group members with avatars and key icons
+     - [ ] Large red "Add Request" button in the bottom left
+   - [ ] Add custom copy explaining Parc-It! and its anonymous, cryptographic group signature system, tailored to the 0xPARC office
+   - [ ] Ensure all placeholder/demo content is removed
+
 # Project Status Board
 
 - [x] Project scaffolding
@@ -557,3 +567,9 @@ CREATE TABLE comments (
 - Use fetch API to get keys from `https://github.com/{username}.keys`
 - Parse the first RSA key and update the database
 - Handle errors (e.g., user not found, no keys, network issues) 
+
+# Success Criteria for UI Overhaul
+- No Next.js starter/demo content remains
+- Layout matches the retro Windows 95 mockup (title bar, sidebar, feed, add button)
+- Custom copy is present and clearly explains the app's purpose and cryptographic anonymity
+- All content and UI is relevant to Parc-It! and the 0xPARC office 
