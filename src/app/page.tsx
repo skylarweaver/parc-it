@@ -25,6 +25,11 @@ export default function Home() {
   const [requestDesc, setRequestDesc] = React.useState("");
   const [requestMsg, setRequestMsg] = React.useState<string | null>(null);
   const [requestLoading, setRequestLoading] = React.useState(false);
+  const [requests, setRequests] = React.useState<any[]>([]);
+  const [requestsLoading, setRequestsLoading] = React.useState(false);
+  const [verifyModalOpen, setVerifyModalOpen] = React.useState(false);
+  const [verifyRequest, setVerifyRequest] = React.useState<any>(null);
+  const [deleteLoading, setDeleteLoading] = React.useState(false);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -217,6 +222,65 @@ export default function Home() {
     setRequestLoading(false);
   };
 
+  // Fetch requests from Supabase
+  const fetchRequests = async () => {
+    setRequestsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("office_requests")
+        .select("id, emoji, description, posted_by, created_at, deleted")
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("Failed to fetch requests:", error);
+        setRequests([]);
+      } else {
+        setRequests((data || []).filter((r: any) => !r.deleted));
+      }
+    } catch (e) {
+      console.error("Unexpected error fetching requests:", e);
+      setRequests([]);
+    }
+    setRequestsLoading(false);
+  };
+
+  // Fetch requests on mount and after modal closes
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+  useEffect(() => {
+    if (!addRequestOpen) {
+      fetchRequests();
+    }
+  }, [addRequestOpen]);
+
+  // Open verify modal for a request
+  const handleOpenVerify = (req: any) => {
+    setVerifyRequest(req);
+    setVerifyModalOpen(true);
+  };
+  const handleCloseVerify = () => {
+    setVerifyModalOpen(false);
+    setVerifyRequest(null);
+  };
+
+  // Admin delete handler
+  const handleDeleteRequest = async (id: string) => {
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase.from("office_requests").update({ deleted: true }).eq("id", id);
+      if (error) {
+        alert("Failed to delete request: " + error.message);
+      } else {
+        handleCloseVerify();
+        fetchRequests();
+      }
+    } catch (e) {
+      alert("Unexpected error deleting request.");
+      console.error(e);
+    }
+    setDeleteLoading(false);
+  };
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
@@ -367,6 +431,50 @@ export default function Home() {
                 <Button variant="default" onClick={handleSubmitRequest} disabled={requestLoading}>
                   {requestLoading ? "Submitting..." : "Submit"}
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Request Feed */}
+        <div className="w-full max-w-xl mt-10">
+          <h2 className="text-lg font-bold mb-4">Office Requests</h2>
+          {requestsLoading ? (
+            <div>Loading requests...</div>
+          ) : requests.length === 0 ? (
+            <div className="text-gray-500">No requests yet.</div>
+          ) : (
+            <ul className="space-y-4">
+              {requests.map((req) => (
+                <li key={req.id} className="border rounded p-4 flex items-center gap-4 bg-white shadow-sm">
+                  <span className="text-3xl w-10 text-center">{req.emoji}</span>
+                  <span className="flex-1">{req.description}</span>
+                  <span className="text-xs text-gray-400 ml-2">{req.posted_by ? req.posted_by.slice(0, 8) + "..." : "Anonymous"}</span>
+                  <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
+                  {isAdmin && (
+                    <Button variant="destructive" size="sm" className="ml-2" onClick={() => handleDeleteRequest(req.id)} disabled={deleteLoading}>Delete</Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {/* Verify Modal */}
+        {verifyModalOpen && verifyRequest && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
+              <h2 className="text-xl font-bold mb-4">Verify Group Signature</h2>
+              <div className="mb-2">Signature valid: <span className="text-green-600 font-semibold">Yes</span></div>
+              <div className="mb-2">Public signal: <span className="font-mono">dummy-signal</span></div>
+              <div className="mb-2">Merkle root: <span className="font-mono">dummy-root</span></div>
+              <div className="mb-2">Circuit/proof ID: <span className="font-mono">dummy-circuit</span></div>
+              <div className="mb-2">Time posted: <span className="font-mono">{verifyRequest.created_at}</span></div>
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" onClick={handleCloseVerify}>Close</Button>
+                {isAdmin && (
+                  <Button variant="destructive" onClick={() => handleDeleteRequest(verifyRequest.id)} disabled={deleteLoading}>
+                    {deleteLoading ? "Deleting..." : "Delete"}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
