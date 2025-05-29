@@ -65,7 +65,9 @@ Key differences from double-blind:
 
 # Executor's Feedback or Assistance Requests
 
-_(To be filled by Executor during implementation)_
+- Successfully initialized Next.js app in `parc-it/`.
+- Next step: Set up Tailwind CSS.
+- Note: If any files or folders (like `.cursor/`) are present, ensure they do not conflict with Next.js initialization. Temporarily moving them out of the way may be necessary.
 
 # Lessons
 
@@ -74,6 +76,7 @@ _(To be filled by Executor during implementation)_
 - No OAuth or passwords; login via parc-it key only
 - Admins identified by hardcoded SSH pub keys
 - Fetch only first RSA key from GitHub .keys every 10 minutes
+- If initializing Next.js in a non-empty directory, ensure no conflicting files exist (e.g., move `.cursor/` temporarily)
 
 # High-level User Flow
 
