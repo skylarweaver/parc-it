@@ -119,6 +119,7 @@ Key differences from double-blind:
   - [ ] Admin-only delete
   - [ ] Sidebar group members
   - [ ] Retro styling
+- [In Progress] Implement group member selection in Add Request modal, remove submitter identity from requests, and update backend schema.
 
 # Success Criteria for Data Models & Supabase Schema
 
@@ -171,6 +172,7 @@ Key differences from double-blind:
 - Next step: Port/adapt the actual key extraction and validation logic from double-blind
 - [In Progress] Refactoring admin privilege logic to use Supabase `admins` table and updating admin message UI for color feedback.
 - [In Progress] Implementing always-visible Add Request button, disabled unless logged in, as first step of request feed and submission feature.
+- [In Progress] Adding multi-select group member UI to Add Request modal, updating request submission to include only the selected group, and preparing Supabase schema changes (remove posted_by, add group_members array).
 
 # Lessons
 
@@ -573,3 +575,10 @@ CREATE TABLE comments (
 - Layout matches the retro Windows 95 mockup (title bar, sidebar, feed, add button)
 - Custom copy is present and clearly explains the app's purpose and cryptographic anonymity
 - All content and UI is relevant to Parc-It! and the 0xPARC office 
+
+
+
+
+Skylar todos DO NO TOUCH:
+- add refresh of group members keys from github
+- add check on backend for proof verificaiton. unless we want people to submit requests which bad proofs

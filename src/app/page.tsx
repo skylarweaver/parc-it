@@ -32,6 +32,7 @@ export default function Home() {
   const [deleteLoading, setDeleteLoading] = React.useState(false);
   const [keyModalOpen, setKeyModalOpen] = React.useState(false);
   const [keyMember, setKeyMember] = React.useState<any>(null);
+  const [selectedGroup, setSelectedGroup] = React.useState<string[]>([]);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -199,6 +200,14 @@ export default function Home() {
     setMemberLoading(false);
   };
 
+  // When opening the Add Request modal, default to all members selected (only if selectedGroup is empty)
+  useEffect(() => {
+    if (addRequestOpen && selectedGroup.length === 0 && members.length > 0) {
+      setSelectedGroup(members.map((m) => m.github_username));
+    }
+    // eslint-disable-next-line
+  }, [addRequestOpen]);
+
   // Add Request modal submit handler
   const handleSubmitRequest = async () => {
     setRequestMsg(null);
@@ -206,15 +215,20 @@ export default function Home() {
       setRequestMsg("Please enter an emoji and a description.");
       return;
     }
+    if (selectedGroup.length < 2) {
+      setRequestMsg("Please select at least two group members.");
+      return;
+    }
     setRequestLoading(true);
     try {
+      // Dummy proof check: always valid for now
       const { error } = await supabase.from("office_requests").insert({
         emoji: requestEmoji.trim(),
         description: requestDesc.trim(),
         signature: { dummy: true }, // TODO: real signature later
         group_id: "00000000-0000-0000-0000-000000000000", // TODO: real group logic
         public_signal: "dummy-signal", // TODO: real signal
-        posted_by: userPubKey,
+        group_members: selectedGroup,
         deleted: false,
         metadata: {},
       });
@@ -243,7 +257,7 @@ export default function Home() {
     try {
       const { data, error } = await supabase
         .from("office_requests")
-        .select("id, emoji, description, posted_by, created_at, deleted")
+        .select("id, emoji, description, created_at, deleted, group_members")
         .order("created_at", { ascending: false });
       if (error) {
         console.error("Failed to fetch requests:", error);
@@ -377,7 +391,6 @@ export default function Home() {
                   <li key={req.id} className="border-2 border-gray-400 rounded-lg p-4 flex items-center gap-4 bg-white shadow-sm">
                     <span className="text-3xl w-10 text-center">{req.emoji}</span>
                     <span className="flex-1 font-bold text-lg">{req.description}</span>
-                    <span className="text-xs text-gray-400 ml-2 font-mono">{req.posted_by ? req.posted_by.slice(0, 8) + "..." : "Anonymous"}</span>
                     <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
                     {isAdmin && (
                       <Button variant="destructive" size="sm" className="ml-2" onClick={() => handleDeleteRequest(req.id)} disabled={deleteLoading}>Delete</Button>
@@ -424,6 +437,30 @@ export default function Home() {
                 onChange={e => setRequestDesc(e.target.value)}
                 disabled={requestLoading}
               />
+            </div>
+            <div className="mb-4">
+              <label className="block mb-1 font-semibold">Select Group Members</label>
+              <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
+                {members.map((m) => (
+                  <label key={m.id} className="flex items-center gap-2 py-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedGroup.includes(m.github_username)}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setSelectedGroup([...selectedGroup, m.github_username]);
+                        } else {
+                          setSelectedGroup(selectedGroup.filter(u => u !== m.github_username));
+                        }
+                      }}
+                      disabled={requestLoading}
+                    />
+                    <img src={m.avatar_url} alt={m.github_username} className="w-6 h-6 rounded-full border border-gray-300" />
+                    <span className="font-mono text-xs">{m.github_username}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">Only the selected members will be included in the group signature proof.</div>
             </div>
             {requestMsg && (
               <div className={`mb-2 text-sm font-semibold ${requestMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{requestMsg}</div>
