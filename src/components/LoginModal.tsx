@@ -1,0 +1,52 @@
+import React, { useState } from "react";
+import { Button } from "./ui/button";
+import { extractPublicKeyFromSignature, validateParcItKey } from "../helpers/parcItKey";
+
+const EXPECTED_MESSAGE = 14447023197094784173331616578829287000074783130802912942914027114823662617007553911501158244718575362051758829289159984830457466395841150324770159971462582912755545324694933673046215187947905307019469n; // double-blind base message
+
+interface LoginModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onLogin: (key: string, pubKey: string) => void;
+}
+
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => {
+  const [key, setKey] = useState("");
+  const [error, setError] = useState("");
+
+  if (!isOpen) return null;
+
+  const handleLogin = () => {
+    setError("");
+    const pubKey = extractPublicKeyFromSignature(key);
+    if (!pubKey || pubKey.startsWith("ERROR")) {
+      setError("Could not extract a valid SSH public key from the signature.");
+      return;
+    }
+    const valid = validateParcItKey(key, EXPECTED_MESSAGE);
+    if (!valid) {
+      setError("Signature is not valid for the expected message. Please check your Parc-It key.");
+      return;
+    }
+    onLogin(key, pubKey);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
+        <button className="absolute top-2 right-3 text-xl" onClick={onClose}>&times;</button>
+        <h2 className="text-lg font-bold mb-4">Login with Parc-It Key</h2>
+        <textarea
+          className="w-full border rounded p-2 mb-2 min-h-[100px]"
+          placeholder="Paste your Parc-It key (SSH signature) here"
+          value={key}
+          onChange={e => setKey(e.target.value)}
+        />
+        {error && <div className="text-red-600 mb-2">{error}</div>}
+        <Button className="w-full" onClick={handleLogin}>
+          Login
+        </Button>
+      </div>
+    </div>
+  );
+}; 

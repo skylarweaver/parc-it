@@ -1,7 +1,40 @@
+"use client";
 import Image from "next/image";
 import { Button } from "../components/ui/button";
+import { LoginModal } from "../components/LoginModal";
+import React from "react";
+
+const MOCK_GROUP_MEMBERS = [
+  // Replace with real group member public keys
+  "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7...",
+];
 
 export default function Home() {
+  const [loginOpen, setLoginOpen] = React.useState(false);
+  const [loginStatus, setLoginStatus] = React.useState<string | null>(null);
+  const [loggedIn, setLoggedIn] = React.useState(false);
+  const [userPubKey, setUserPubKey] = React.useState<string | null>(null);
+
+  const handleLogin = (key: string, pubKey: string) => {
+    console.log("Derived public key:", pubKey);
+    // For now, check against mock group members
+    const isMember = MOCK_GROUP_MEMBERS.includes(pubKey);
+    if (isMember) {
+      setLoggedIn(true);
+      setUserPubKey(pubKey);
+      setLoginStatus("Login successful! You are recognized as a group member.");
+      setLoginOpen(false);
+      localStorage.setItem("parcItKey", key);
+      localStorage.setItem("parcItPubKey", pubKey);
+      console.log("Login successful. User public key:", pubKey);
+    } else {
+      setLoginStatus("Your key is valid, but you are not a recognized group member.");
+      setLoggedIn(false);
+      setUserPubKey(null);
+      console.log("Key valid but not a group member:", pubKey);
+    }
+  };
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
@@ -52,8 +85,20 @@ export default function Home() {
           </a>
         </div>
         <div className="mt-8">
-          <Button variant="default">shadcn/ui Button Test</Button>
+          <Button variant="default" onClick={() => setLoginOpen(true)}>
+            {loggedIn ? "Logged in" : "Login with Parc-It Key"}
+          </Button>
         </div>
+        {loginStatus && (
+          <div className={`mt-4 text-${loggedIn ? "green" : "red"}-600 font-semibold`}>
+            {loginStatus}
+          </div>
+        )}
+        <LoginModal
+          isOpen={loginOpen}
+          onClose={() => setLoginOpen(false)}
+          onLogin={handleLogin}
+        />
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
         <a

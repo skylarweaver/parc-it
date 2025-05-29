@@ -23,18 +23,41 @@ Key differences from double-blind:
 # High-level Task Breakdown
 
 1. **Project Scaffolding**
-   - [ ] Set up Next.js app with Tailwind and shadcn/ui in `parc-it/`
-   - [ ] Set up Supabase backend and connect to the app
-   - [ ] Create initial docs folder
+   - [x] Set up Next.js app with Tailwind and shadcn/ui in `parc-it/`
+   - [x] Create initial docs folder
 
 2. **Data Models & Supabase Schema**
-   - [ ] Define tables: `office_requests`, `group_members`, `admins`, (future: `upvotes`, `comments`)
-   - [ ] Implement periodic GitHub key fetching (backend cron or Supabase function)
+   - [x] Define Supabase tables: `office_requests`, `group_members`, `admins` (future: `upvotes`, `comments`)
+     - [x] Write SQL for each table and document in `/docs/schema.sql`
+     - [x] Apply schema to Supabase project (manual or via migration)
+     - [x] Verify tables exist in Supabase dashboard
+   - [x] Implement periodic GitHub key fetching
+     - [x] Write a Supabase Edge Function (or scheduled job) to:
+         - Fetch the first RSA key from each group member's GitHub .keys page
+         - Update the `public_key` and `last_key_fetch` fields in `group_members`
+         - TODO for later: Run every 10 minutes (use Supabase scheduled jobs or external scheduler)
+     - [x] Test the function with a sample GitHub username
+     - [x] Document the function and its deployment in `/docs/`
 
 3. **Authentication & Admin Management**
    - [ ] Implement login with "parc-it key" (stub)
-   - [ ] Admin UI for managing group members (add/remove GitHub usernames)
+     - [ ] Create a login modal for users to paste their parc-it key
+     - [ ] **Derive the public key from the input and check against `group_members`**
+       - Use logic from double-blind's [`sshSignatureToPubKey`](double-blind/src/helpers/sshFormat.ts) to extract the SSH public key from the pasted signature.
+     - [ ] **Validate the signature is correct for the expected message**
+       - Use logic from double-blind's [`getCircuitInputs`](double-blind/src/helpers/groupSignature/sign.ts) and [`getRawSignature`](double-blind/src/helpers/sshFormat.ts) to:
+         - Parse the signature and extract the raw signature and public key
+         - Use RSA verification to check the signature is valid for the expected message (e.g., "E PLURIBUS UNUM; DO NOT SHARE")
+         - Only authenticate if both the public key matches and the signature is valid
+     - [ ] Store session in local storage (no OAuth/passwords)
+     - [ ] Show error if key is invalid
+   - [ ] Admin UI for managing group members
+     - [ ] Add/remove GitHub usernames via the UI (admin only)
+     - [ ] Update `group_members` table accordingly
+     - [ ] UI should only be visible to admins
    - [ ] Hardcode admin SSH pub keys in backend
+     - [ ] Store admin public keys in a secure config or environment variable
+     - [ ] Use these keys to determine admin privileges in the app
 
 4. **Frontend UI**
    - [ ] Home page: feed of requests, verify modal, sidebar with group members
@@ -55,19 +78,56 @@ Key differences from double-blind:
 
 # Project Status Board
 
-- [ ] Project scaffolding
-- [ ] Data models/schema
+- [x] Project scaffolding
+- [x] Data models/schema
+  - [x] Define Supabase tables and document schema
+  - [x] Apply schema to Supabase
+  - [x] Implement GitHub key fetcher
 - [ ] Auth/admin management
+  - [ ] Implement login with parc-it key (modal UI and helper scaffolding done; port logic next)
+  - [ ] Admin UI for group member management
+  - [ ] Hardcode admin SSH pub keys
 - [ ] Frontend UI
 - [ ] Request verification/key display
 - [ ] Documentation
 - [ ] Future-proofing
+  - [ ] TODO: Revisit GitHub key fetcher scheduling—either set up a Supabase scheduled job or trigger the function on every app load.
+
+# Success Criteria for Data Models & Supabase Schema
+
+- All required tables are defined in Supabase and documented in `/docs/schema.sql`
+- GitHub key fetcher runs on a schedule and updates group member keys in the database
+- Manual test: Add a GitHub username, fetch key, and verify in Supabase
+
+# Success Criteria for GitHub Key Fetcher
+
+- Edge Function (or job) fetches and updates keys for all group members
+- `public_key` and `last_key_fetch` fields are updated in Supabase
+- Manual test: Add a GitHub username, run the function, and verify the key is fetched and stored
+- Function and deployment steps are documented in `/docs/`
+
+# Success Criteria for Auth/Admin Management
+
+- Users can log in with a parc-it key and are recognized as group members
+- **Key derivation and validation logic matches double-blind:**
+  - Public key is extracted from the signature using [`sshSignatureToPubKey`](double-blind/src/helpers/sshFormat.ts)
+  - Signature is validated for the expected message using [`getCircuitInputs`](double-blind/src/helpers/groupSignature/sign.ts)
+- Admins can add/remove group members via the UI
+- Only admins see admin controls
+- Admin privileges are determined by hardcoded SSH pub keys
+- Session is managed in local storage (no OAuth/passwords)
+- Error handling for invalid keys and unauthorized actions
 
 # Executor's Feedback or Assistance Requests
 
-- Successfully initialized Next.js app in `parc-it/`.
-- Next step: Set up Tailwind CSS.
-- Note: If any files or folders (like `.cursor/`) are present, ensure they do not conflict with Next.js initialization. Temporarily moving them out of the way may be necessary.
+- Project scaffolding is complete and committed:
+  - Next.js app runs with Tailwind and shadcn/ui working (test button renders)
+  - Directory structure (`components/`, `pages/`, `lib/`, `styles/`) is in place
+  - README and docs folder created
+- Ready for Planner review before proceeding to the next major task (Data models/schema)
+- Login modal UI created in `src/components/LoginModal.tsx`
+- Helper functions for parc-it key derivation/validation scaffolded in `src/helpers/parcItKey.ts`
+- Next step: Port/adapt the actual key extraction and validation logic from double-blind
 
 # Lessons
 
@@ -457,3 +517,10 @@ CREATE TABLE comments (
 - Able to run the app locally with Tailwind and shadcn/ui working
 - Directory structure and initial files match the plan
 - README and docs folder are present 
+
+# Planner's Notes
+
+- Use Supabase Edge Functions for serverless logic; schedule with Supabase scheduled jobs or external cron if needed
+- Use fetch API to get keys from `https://github.com/{username}.keys`
+- Parse the first RSA key and update the database
+- Handle errors (e.g., user not found, no keys, network issues) 
