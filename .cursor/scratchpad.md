@@ -40,24 +40,13 @@ Key differences from double-blind:
      - [x] Document the function and its deployment in `/docs/`
 
 3. **Authentication & Admin Management**
-   - [ ] Implement login with "parc-it key" (stub)
-     - [ ] Create a login modal for users to paste their parc-it key
-     - [ ] **Derive the public key from the input and check against `group_members`**
-       - Use logic from double-blind's [`sshSignatureToPubKey`](double-blind/src/helpers/sshFormat.ts) to extract the SSH public key from the pasted signature.
-     - [ ] **Validate the signature is correct for the expected message**
-       - Use logic from double-blind's [`getCircuitInputs`](double-blind/src/helpers/groupSignature/sign.ts) and [`getRawSignature`](double-blind/src/helpers/sshFormat.ts) to:
-         - Parse the signature and extract the raw signature and public key
-         - Use RSA verification to check the signature is valid for the expected message (e.g., "E PLURIBUS UNUM; DO NOT SHARE")
-         - Only authenticate if both the public key matches and the signature is valid
-     - [ ] Store session in local storage (no OAuth/passwords)
-     - [ ] Show error if key is invalid
+   - [x] Implement login with "parc-it key" (with double-blind-style validation and derivation)
    - [ ] Admin UI for managing group members
-     - [ ] Add/remove GitHub usernames via the UI (admin only)
-     - [ ] Update `group_members` table accordingly
-     - [ ] UI should only be visible to admins
-   - [ ] Hardcode admin SSH pub keys in backend
-     - [ ] Store admin public keys in a secure config or environment variable
-     - [ ] Use these keys to determine admin privileges in the app
+     - [ ] Detect admin privilege by checking if the logged-in user's public key matches a hardcoded list of admin SSH pub keys (from config or env)
+     - [ ] Show admin-only UI for adding/removing GitHub usernames (and their keys) to/from the `group_members` table
+     - [ ] Integrate with Supabase to perform add/remove actions
+     - [ ] Show clear user-facing messages for success/failure
+     - [ ] Only show admin UI if user is an admin
 
 4. **Frontend UI**
    - [ ] Home page: feed of requests, verify modal, sidebar with group members
@@ -76,6 +65,22 @@ Key differences from double-blind:
    - [ ] Scaffold for upvotes/comments (optional, stubs only)
    - [ ] Placeholder cryptography functions
 
+3a. **Fix CORS Issue for GitHub Key Fetching in Admin UI**
+   - [ ] Implement a Next.js API route (`/api/github-keys`) that fetches a user's public SSH keys from GitHub server-side
+     - [ ] Accepts a `username` query parameter
+     - [ ] Fetches `https://github.com/{username}.keys` and returns the keys as plain text or JSON
+     - [ ] Handles errors (user not found, no keys, network issues)
+   - [ ] Update Admin UI to call this API route instead of fetching from GitHub directly in the browser
+   - [ ] Test adding a member via the Admin UI and verify no CORS errors occur
+   - [ ] Show clear error messages for all failure cases
+
+2. **Add Request Modal**
+   - [ ] Add Request button is always visible to everyone, but greyed out (disabled) unless logged in
+   - [ ] Only visible (enabled) to logged-in group members
+   - [ ] Modal with emoji picker and text field
+   - [ ] On submit, insert a new row into `office_requests` (with dummy signature for now)
+   - [ ] Show success/error feedback
+
 # Project Status Board
 
 - [x] Project scaffolding
@@ -84,14 +89,26 @@ Key differences from double-blind:
   - [x] Apply schema to Supabase
   - [x] Implement GitHub key fetcher
 - [ ] Auth/admin management
-  - [ ] Implement login with parc-it key (modal UI and helper scaffolding done; port logic next)
+  - [x] Implement login with parc-it key (modal UI and helper scaffolding done; port logic next)
   - [ ] Admin UI for group member management
-  - [ ] Hardcode admin SSH pub keys
+  - [ ] Refactor admin privilege logic to use Supabase `admins` table
+  - [ ] Update admin message UI for success/error color
 - [ ] Frontend UI
 - [ ] Request verification/key display
 - [ ] Documentation
 - [ ] Future-proofing
   - [ ] TODO: Revisit GitHub key fetcher scheduling—either set up a Supabase scheduled job or trigger the function on every app load.
+- [ ] Fix CORS for GitHub key fetch in Admin UI
+  - [ ] Implement Next.js API route for GitHub keys
+  - [ ] Update Admin UI to use API route
+  - [ ] Test and verify CORS is resolved
+- [In Progress] Implement office request feed and submission
+  - [ ] Request feed UI
+  - [ ] Add request modal (button always visible, only enabled for logged-in group members)
+  - [ ] Verify modal (dummy)
+  - [ ] Admin-only delete
+  - [ ] Sidebar group members
+  - [ ] Retro styling
 
 # Success Criteria for Data Models & Supabase Schema
 
@@ -118,6 +135,20 @@ Key differences from double-blind:
 - Session is managed in local storage (no OAuth/passwords)
 - Error handling for invalid keys and unauthorized actions
 
+# Success Criteria for Admin UI
+
+- Only admins (by SSH pub key) see the group member management UI
+- Admins can add a GitHub username (and avatar/key) to the `group_members` table
+- Admins can remove a GitHub username from the table
+- All actions show clear success/failure messages
+- Non-admins do not see admin controls
+
+# Success Criteria for GitHub Key API Route
+- API route `/api/github-keys` fetches and returns SSH keys for a given GitHub username
+- Admin UI uses this route and no longer triggers CORS errors
+- Adding a member via Admin UI works end-to-end (avatar and key fetched, member added)
+- All error cases (user not found, no keys, network error) are handled and shown in the UI
+
 # Executor's Feedback or Assistance Requests
 
 - Project scaffolding is complete and committed:
@@ -128,6 +159,8 @@ Key differences from double-blind:
 - Login modal UI created in `src/components/LoginModal.tsx`
 - Helper functions for parc-it key derivation/validation scaffolded in `src/helpers/parcItKey.ts`
 - Next step: Port/adapt the actual key extraction and validation logic from double-blind
+- [In Progress] Refactoring admin privilege logic to use Supabase `admins` table and updating admin message UI for color feedback.
+- [In Progress] Implementing always-visible Add Request button, disabled unless logged in, as first step of request feed and submission feature.
 
 # Lessons
 
