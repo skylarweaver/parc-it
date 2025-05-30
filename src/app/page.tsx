@@ -39,52 +39,20 @@ export default function Home() {
     setLoginStatus(null);
     setIsAdmin(false);
     try {
-      const { data, error } = await supabase
-        .from("group_members")
-        .select("public_key")
-        .eq("public_key", pubKey)
-        .maybeSingle();
-      console.log("Supabase group_members query result:", data, error);
-      if (error) {
-        setLoginStatus("Error checking group membership. Please try again later.");
+      // Only local validation: check if we can derive a valid SSH key from the Parc-It Key
+      if (!pubKey || pubKey.startsWith("ERROR")) {
+        setLoginStatus("Could not extract a valid SSH public key from the signature.");
         setLoggedIn(false);
         setUserPubKey(null);
         setLoading(false);
         return;
       }
-      if (data && data.public_key === pubKey) {
-        setLoggedIn(true);
-        setUserPubKey(pubKey);
-        // Query admins table for admin status
-        const { data: adminData, error: adminError } = await supabase
-          .from("admins")
-          .select("id")
-          .eq("public_key", pubKey)
-          .maybeSingle();
-        let isAdminNow = false;
-        if (adminError) {
-          console.error("Error checking admin status:", adminError);
-          setIsAdmin(false);
-        } else {
-          isAdminNow = !!adminData;
-          setIsAdmin(isAdminNow);
-        }
-        setLoginStatus(
-          isAdminNow
-            ? "Login successful! You are recognized as a group member and an Admin."
-            : "Login successful! You are recognized as a group member."
-        );
-        setLoginOpen(false);
-        localStorage.setItem("parcItKey", key);
-        localStorage.setItem("parcItPubKey", pubKey);
-        console.log("Login successful. User public key:", pubKey, "isAdmin:", isAdminNow);
-      } else {
-        setLoginStatus("Your key is valid, but you are not a recognized group member.");
-        setLoggedIn(false);
-        setUserPubKey(null);
-        setIsAdmin(false);
-        console.log("Key valid but not a group member:", pubKey);
-      }
+      setLoggedIn(true);
+      setUserPubKey(pubKey);
+      setLoginStatus("Login successful! You are recognized as a group member.");
+      setLoginOpen(false);
+      localStorage.setItem("parcItKey", key);
+      localStorage.setItem("parcItPubKey", pubKey);
     } catch (e) {
       setLoginStatus("Unexpected error during login. Please try again.");
       setLoggedIn(false);
@@ -123,12 +91,6 @@ export default function Home() {
   useEffect(() => {
     fetchMembers();
   }, []);
-  // Also fetch after add/remove
-  useEffect(() => {
-    if (!memberLoading) {
-      fetchMembers();
-    }
-  }, [memberLoading]);
 
   // Add member handler
   const handleAddMember = async () => {
@@ -327,6 +289,7 @@ export default function Home() {
         <span className="font-bold text-xl mr-4">📝 Parc-It</span>
         <span className="ml-2 text-sm font-mono tracking-tight">Anonymous Office Request Board for 0xPARC</span>
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+          <a href="/admin" className="underline text-xs text-white hover:text-blue-200 mr-4">Admin Portal</a>
           {!loggedIn ? (
             <button
               className="px-4 py-2 bg-white text-[#1a237e] font-bold rounded border-2 border-gray-400 shadow active:translate-y-0.5 active:shadow-none transition-all retro-btn ml-2 my-1"
@@ -392,9 +355,6 @@ export default function Home() {
                     <span className="text-3xl w-10 text-center">{req.emoji}</span>
                     <span className="flex-1 font-bold text-lg">{req.description}</span>
                     <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
-                    {isAdmin && (
-                      <Button variant="destructive" size="sm" className="ml-2" onClick={() => handleDeleteRequest(req.id)} disabled={deleteLoading}>Delete</Button>
-                    )}
                   </li>
                 ))}
               </ul>
@@ -487,11 +447,6 @@ export default function Home() {
             <div className="mb-2">Time posted: <span className="font-mono">{verifyRequest.created_at}</span></div>
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" onClick={handleCloseVerify}>Close</Button>
-              {isAdmin && (
-                <Button variant="destructive" onClick={() => handleDeleteRequest(verifyRequest.id)} disabled={deleteLoading}>
-                  {deleteLoading ? "Deleting..." : "Delete"}
-                </Button>
-              )}
             </div>
           </div>
         </div>

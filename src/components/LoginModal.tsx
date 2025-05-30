@@ -8,9 +8,10 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogin: (key: string, pubKey: string) => void;
+  admin?: boolean;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, admin }) => {
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
 
@@ -39,7 +40,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         <div className="mb-4 text-sm text-gray-700">
           <p className="mb-2">
             <strong>How to get your Parc-It Key:</strong><br />
-            You need to generate a special SSH signature using your SSH private key. This proves you are a group member, but keeps you anonymous. Your SSH private key never leaves your machine.
+            You need to generate a special SSH signature using your SSH private key. From this signature, we can derive your SSH public key. Your SSH private key never leaves your machine. Your SSH public key is stored client-side only.
           </p>
           <ol className="list-decimal list-inside mb-2">
             <li>Make sure you have an <strong>RSA SSH keypair</strong> (e.g. <code>~/.ssh/id_rsa</code>). If you don&apos;t, generate one with:<br />
@@ -51,6 +52,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             <li className="mt-2">Copy the full output (including the BEGIN/END lines) and paste it below.</li>
           </ol>
           <p className="text-xs text-gray-500">For more details, see the <a href="https://github.com/doubleblind-xyz/double-blind" target="_blank" rel="noopener noreferrer" className="underline">double-blind documentation</a>.</p>
+          {admin && (
+            <div className="mt-4 text-red-600 font-semibold text-sm">
+              Warning: If you log in as an admin, your SSH public key will be sent to the server for admin verification. For maximum privacy, allow time between performing admin actions and sending anonymous office requests.
+            </div>
+          )}
         </div>
         <textarea
           className="w-full border rounded p-2 mb-2 min-h-[100px]"
