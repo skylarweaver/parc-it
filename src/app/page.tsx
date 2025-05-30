@@ -5,6 +5,8 @@ import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateSignature, verifySignature } from "../helpers/plonky2/utils";
+import { Switch } from "../components/ui/switch";
+import EmojiPicker, { Theme, EmojiStyle } from 'emoji-picker-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -36,6 +38,10 @@ export default function Home() {
   const [selectedGroup, setSelectedGroup] = React.useState<string[]>([]);
   const [parcItKey, setParcItKey] = React.useState<string | null>(null);
   const [verifyResult, setVerifyResult] = React.useState<{valid: boolean, groupKeys?: string, error?: any} | null>(null);
+  const [isDoxxed, setIsDoxxed] = React.useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
+  const emojiPickerRef = React.useRef<HTMLDivElement>(null);
+  const [admins, setAdmins] = React.useState<any[]>([]);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -93,9 +99,22 @@ export default function Home() {
     setMemberLoading(false);
   };
 
+  // Fetch admins from Supabase
+  const fetchAdmins = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("admins")
+        .select("id, github_username");
+      if (!error && data) setAdmins(data);
+    } catch (e) {
+      setAdmins([]);
+    }
+  };
+
   // Fetch members on mount and after add/remove
   useEffect(() => {
     fetchMembers();
+    fetchAdmins();
   }, []);
 
   // Add member handler
@@ -183,20 +202,36 @@ export default function Home() {
       setRequestMsg("Please enter an emoji and a description.");
       return;
     }
-    if (selectedGroup.length < 2) {
-      setRequestMsg("Please select at least two group members.");
-      return;
-    }
     if (!parcItKey) {
       setRequestMsg("You must be logged in to submit a request.");
       return;
     }
+    if (!isDoxxed && selectedGroup.length < 2) {
+      setRequestMsg("Please select at least two group members.");
+      return;
+    }
     setRequestLoading(true);
     try {
+      // Determine group_members and doxxed_member_id
+      let groupMembers: string[] = [];
+      let doxxedMemberId: string | null = null;
+      if (isDoxxed) {
+        const self = members.find(m => m.public_key === userPubKey);
+        if (!self) {
+          setRequestMsg("Could not find your group member info for doxxed request.");
+          setRequestLoading(false);
+          return;
+        }
+        groupMembers = [self.github_username];
+        doxxedMemberId = self.id;
+      } else {
+        groupMembers = selectedGroup;
+        doxxedMemberId = null;
+      }
       // Build message and group keys
       const message = `${requestEmoji} ${requestDesc}`;
       const groupKeys = members
-        .filter((m) => selectedGroup.includes(m.github_username))
+        .filter((m) => groupMembers.includes(m.github_username))
         .map((m) => m.public_key)
         .join('\n');
       // Generate signature
@@ -208,7 +243,8 @@ export default function Home() {
         signature, // real signature
         group_id: "00000000-0000-0000-0000-000000000000", // TODO: real group logic
         public_signal: "dummy-signal", // TODO: real signal
-        group_members: selectedGroup,
+        group_members: groupMembers,
+        doxxed_member_id: doxxedMemberId,
         deleted: false,
         metadata: {},
       });
@@ -252,7 +288,7 @@ export default function Home() {
     try {
       const { data, error } = await supabase
         .from("office_requests")
-        .select("id, emoji, description, created_at, deleted, group_members, signature")
+        .select("id, emoji, description, created_at, deleted, group_members, signature, doxxed_member_id")
         .order("created_at", { ascending: false });
       if (error) {
         console.error("Failed to fetch requests:", error);
@@ -346,6 +382,19 @@ export default function Home() {
     }
   }, []);
 
+  React.useEffect(() => {
+    if (!showEmojiPicker) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
+
   return (
     <div className="relative min-h-screen bg-gray-200 font-sans">
       {/* Title Bar/Header (Retro Windows 95 style) */}
@@ -399,6 +448,20 @@ export default function Home() {
                 </li>
               ))}
           </ul>
+          {/* Info note for joining group */}
+          <div className="mt-4 text-xs text-gray-700 border-t pt-3">
+            Want to be a part of the group? <br />
+            <a href="#" className="underline text-blue-700" onClick={e => { e.preventDefault(); setLoginOpen(true); }}>Follow these steps</a> to generate an SSH key, then message an admin:
+            <ul className="mt-1 ml-4 list-disc">
+              {admins.length === 0 ? (
+                <li className="italic text-gray-400">No admins listed</li>
+              ) : (
+                admins.map(a => (
+                  <li key={a.id} className="font-mono">{a.github_username}</li>
+                ))
+              )}
+            </ul>
+          </div>
         </aside>
         {/* Main Feed Area */}
         <main className="flex-1 flex flex-col items-center px-8">
@@ -428,13 +491,40 @@ export default function Home() {
               <div className="text-gray-500">No requests yet.</div>
             ) : (
               <ul className="space-y-4">
-                {requests.map((req) => (
-                  <li key={req.id} className="border-2 border-gray-400 rounded-lg p-4 flex items-center gap-4 bg-white shadow-sm">
-                    <span className="text-3xl w-10 text-center">{req.emoji}</span>
-                    <span className="flex-1 font-bold text-lg">{req.description}</span>
-                    <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
-                  </li>
-                ))}
+                {requests.map((req) => {
+                  // Find group member objects for avatars
+                  const groupMemberObjs = Array.isArray(req.group_members)
+                    ? members.filter(m => req.group_members.includes(m.github_username))
+                    : [];
+                  const isDoxxed = !!req.doxxed_member_id;
+                  return (
+                    <li key={req.id} className="border-2 border-gray-400 rounded-lg p-4 bg-white shadow-sm">
+                      <div className="flex items-center gap-4">
+                        <span className="text-3xl w-10 text-center">{req.emoji}</span>
+                        <span className="flex-1 font-bold text-lg flex items-center gap-2">
+                          {req.description}
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${isDoxxed ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-gray-200 text-gray-700 border border-gray-300'}`}>{isDoxxed ? 'Doxxed' : 'Anonymous'}</span>
+                        </span>
+                        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 ml-14">
+                        {groupMemberObjs.slice(0, 5).map((m, idx) => (
+                          <img
+                            key={m.id}
+                            src={m.avatar_url}
+                            alt={m.github_username}
+                            title={m.github_username}
+                            className="w-7 h-7 rounded-full border-2 border-white shadow -ml-2 first:ml-0"
+                            style={{ zIndex: 10 - idx }}
+                          />
+                        ))}
+                        {groupMemberObjs.length > 5 && (
+                          <span className="ml-1 px-2 py-0.5 bg-gray-200 text-xs rounded-full border border-gray-400 font-mono">+{groupMemberObjs.length - 5} more</span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -445,16 +535,72 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
             <h2 className="text-xl font-bold mb-4">New Office Request</h2>
+            {/* Toggle for Anonymous/Doxxed */}
+            <div className="mb-4">
+              <div className="flex items-center gap-4">
+                <span className={`text-base font-semibold transition-colors duration-200 ${!isDoxxed ? 'text-[#1a237e]' : 'text-gray-500'}`}>Anonymous</span>
+                <button
+                  type="button"
+                  className={`relative w-12 h-7 rounded-full border-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400
+                    ${isDoxxed ? 'bg-blue-600 border-blue-700' : 'bg-gray-300 border-gray-400'}`}
+                  onClick={() => setIsDoxxed(!isDoxxed)}
+                  disabled={requestLoading}
+                  aria-pressed={isDoxxed}
+                  aria-label="Toggle anonymous/doxxed"
+                  tabIndex={0}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-200
+                      ${isDoxxed ? 'translate-x-5' : 'translate-x-0'}`}
+                    style={{ boxShadow: '0 2px 6px rgba(0,0,0,0.10)' }}
+                  />
+                </button>
+                <span className={`text-base font-semibold transition-colors duration-200 ${isDoxxed ? 'text-[#1a237e]' : 'text-gray-500'}`}>Doxxed</span>
+              </div>
+              <div className="mt-1">
+                <span className="text-xs text-gray-500">{isDoxxed ? "Your username will be shown with this request." : "Your request will be anonymous among the group you select below."}</span>
+              </div>
+            </div>
+            {/* If doxxed, show preview of user info */}
+            {isDoxxed && loggedIn && (
+              <div className="mb-4 flex items-center gap-2 bg-gray-50 p-2 rounded border">
+                <img
+                  src={members.find(m => m.public_key === userPubKey)?.avatar_url || ""}
+                  alt={members.find(m => m.public_key === userPubKey)?.github_username || ""}
+                  className="w-6 h-6 rounded-full border border-gray-300"
+                />
+                <span className="font-mono text-xs">{members.find(m => m.public_key === userPubKey)?.github_username || "Unknown"}</span>
+              </div>
+            )}
             <div className="mb-4">
               <label className="block mb-1 font-semibold">Emoji</label>
-              <input
-                className="border rounded p-2 w-16 text-center text-2xl"
-                placeholder="😀"
-                value={requestEmoji}
-                onChange={e => setRequestEmoji(e.target.value)}
-                maxLength={2}
-                disabled={requestLoading}
-              />
+              <div className="relative flex items-center gap-2">
+                <input
+                  className="border rounded p-2 w-16 text-center text-2xl cursor-pointer bg-white"
+                  placeholder="😀"
+                  value={requestEmoji}
+                  onClick={() => setShowEmojiPicker(v => !v)}
+                  readOnly
+                  disabled={requestLoading}
+                  aria-label="Pick an emoji"
+                />
+                {showEmojiPicker && (
+                  <div ref={emojiPickerRef} className="absolute z-50 top-12 left-0">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData, event) => {
+                        setRequestEmoji(emojiData.emoji);
+                        setShowEmojiPicker(false);
+                      }}
+                      theme={Theme.LIGHT}
+                      width={300}
+                      height={350}
+                      previewConfig={{ showPreview: false }}
+                      emojiStyle={EmojiStyle.NATIVE}
+                      style={{ '--epr-emoji-size': '1.4em' } as any}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="mb-4">
               <label className="block mb-1 font-semibold">Description</label>
@@ -473,22 +619,25 @@ export default function Home() {
                   <label key={m.id} className="flex items-center gap-2 py-1 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedGroup.includes(m.github_username)}
+                      checked={isDoxxed
+                        ? m.public_key === userPubKey
+                        : selectedGroup.includes(m.github_username)}
                       onChange={e => {
+                        if (isDoxxed) return; // doxxed: only self, can't change
                         if (e.target.checked) {
                           setSelectedGroup([...selectedGroup, m.github_username]);
                         } else {
                           setSelectedGroup(selectedGroup.filter(u => u !== m.github_username));
                         }
                       }}
-                      disabled={requestLoading}
+                      disabled={requestLoading || (isDoxxed && m.public_key !== userPubKey)}
                     />
                     <img src={m.avatar_url} alt={m.github_username} className="w-6 h-6 rounded-full border border-gray-300" />
                     <span className="font-mono text-xs">{m.github_username}</span>
                   </label>
                 ))}
               </div>
-              <div className="text-xs text-gray-500 mt-1">Only the selected members will be included in the group signature proof.</div>
+              <div className="text-xs text-gray-500 mt-1">{isDoxxed ? "Only you will be included in the group signature. To select other members, switch the toggle to anonymous." : "Only the selected members will be included in the group signature proof."}</div>
             </div>
             {requestMsg && (
               <div className={`mb-2 text-sm font-semibold ${requestMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{requestMsg}</div>
