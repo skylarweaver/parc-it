@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { generateSignature } from "../helpers/plonky2/utils";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -33,6 +34,7 @@ export default function Home() {
   const [keyModalOpen, setKeyModalOpen] = React.useState(false);
   const [keyMember, setKeyMember] = React.useState<any>(null);
   const [selectedGroup, setSelectedGroup] = React.useState<string[]>([]);
+  const [parcItKey, setParcItKey] = React.useState<string | null>(null);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -44,11 +46,13 @@ export default function Home() {
         setLoginStatus("Could not extract a valid SSH public key from the signature.");
         setLoggedIn(false);
         setUserPubKey(null);
+        setParcItKey(null);
         setLoading(false);
         return;
       }
       setLoggedIn(true);
       setUserPubKey(pubKey);
+      setParcItKey(key);
       setLoginStatus("Login successful! You are recognized as a group member.");
       setLoginOpen(false);
       localStorage.setItem("parcItKey", key);
@@ -57,6 +61,7 @@ export default function Home() {
       setLoginStatus("Unexpected error during login. Please try again.");
       setLoggedIn(false);
       setUserPubKey(null);
+      setParcItKey(null);
       setIsAdmin(false);
       console.error(e);
     }
@@ -181,13 +186,25 @@ export default function Home() {
       setRequestMsg("Please select at least two group members.");
       return;
     }
+    if (!parcItKey) {
+      setRequestMsg("You must be logged in to submit a request.");
+      return;
+    }
     setRequestLoading(true);
     try {
-      // Dummy proof check: always valid for now
+      // Build message and group keys
+      const message = `${requestEmoji} ${requestDesc}`;
+      const groupKeys = members
+        .filter((m) => selectedGroup.includes(m.github_username))
+        .map((m) => m.public_key)
+        .join('\n');
+      // Generate signature
+      const signature = await generateSignature(message, groupKeys, parcItKey);
+      // Submit request with signature
       const { error } = await supabase.from("office_requests").insert({
         emoji: requestEmoji.trim(),
         description: requestDesc.trim(),
-        signature: { dummy: true }, // TODO: real signature later
+        signature, // real signature
         group_id: "00000000-0000-0000-0000-000000000000", // TODO: real group logic
         public_signal: "dummy-signal", // TODO: real signal
         group_members: selectedGroup,
@@ -195,7 +212,15 @@ export default function Home() {
         metadata: {},
       });
       if (error) {
-        setRequestMsg("Failed to submit request: " + error.message);
+        let msg = "Failed to submit request: " + error.message;
+        if (error instanceof Error) {
+          if (error.message.includes("does not match any public key")) {
+            msg = "Your Parc-It key is not a member of the selected group. Please check your group selection or log in with the correct key.";
+          } else {
+            msg = error.message;
+          }
+        }
+        setRequestMsg(msg);
       } else {
         setRequestMsg("Request submitted successfully!");
         setRequestEmoji("");
@@ -203,11 +228,18 @@ export default function Home() {
         setTimeout(() => {
           setAddRequestOpen(false);
           setRequestMsg(null);
-          // TODO: refresh feed
         }, 1000);
       }
     } catch (e) {
-      setRequestMsg("Unexpected error submitting request.");
+      let msg = "Unexpected error submitting request.";
+      if (e instanceof Error) {
+        if (e.message.includes("does not match any public key")) {
+          msg = "Your Parc-It key is not a member of the selected group. Please check your group selection or log in with the correct key.";
+        } else {
+          msg = e.message;
+        }
+      }
+      setRequestMsg(msg);
       console.error(e);
     }
     setRequestLoading(false);
@@ -281,6 +313,18 @@ export default function Home() {
     setKeyModalOpen(false);
     setKeyMember(null);
   };
+
+  useEffect(() => {
+    // Auto-login if Parc-It key is in localStorage
+    const storedKey = localStorage.getItem("parcItKey");
+    const storedPubKey = localStorage.getItem("parcItPubKey");
+    if (storedKey && storedPubKey) {
+      setLoggedIn(true);
+      setUserPubKey(storedPubKey);
+      setParcItKey(storedKey);
+      setLoginStatus("Login successful! You are recognized as a group member.");
+    }
+  }, []);
 
   return (
     <div className="relative min-h-screen bg-gray-200 font-sans">
