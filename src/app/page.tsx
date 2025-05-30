@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { generateSignature } from "../helpers/plonky2/utils";
+import { generateSignature, verifySignature } from "../helpers/plonky2/utils";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -35,6 +35,7 @@ export default function Home() {
   const [keyMember, setKeyMember] = React.useState<any>(null);
   const [selectedGroup, setSelectedGroup] = React.useState<string[]>([]);
   const [parcItKey, setParcItKey] = React.useState<string | null>(null);
+  const [verifyResult, setVerifyResult] = React.useState<{valid: boolean, groupKeys?: string, error?: any} | null>(null);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -251,7 +252,7 @@ export default function Home() {
     try {
       const { data, error } = await supabase
         .from("office_requests")
-        .select("id, emoji, description, created_at, deleted, group_members")
+        .select("id, emoji, description, created_at, deleted, group_members, signature")
         .order("created_at", { ascending: false });
       if (error) {
         console.error("Failed to fetch requests:", error);
@@ -314,6 +315,25 @@ export default function Home() {
     setKeyMember(null);
   };
 
+  // Handler for verifying signature
+  const handleVerifySignature = async () => {
+    setVerifyResult(null);
+    if (!verifyRequest) return;
+    // Build message (emoji + description)
+    const message = `${verifyRequest.emoji} ${verifyRequest.description}`;
+    const signature = verifyRequest.signature;
+    if (!signature || typeof signature !== 'string' || signature.length < 10) {
+      setVerifyResult({ valid: false, error: { message: "No valid signature found for this request." } });
+      return;
+    }
+    try {
+      const result = await verifySignature(message, signature);
+      setVerifyResult(result);
+    } catch (e) {
+      setVerifyResult({ valid: false, error: e });
+    }
+  };
+
   useEffect(() => {
     // Auto-login if Parc-It key is in localStorage
     const storedKey = localStorage.getItem("parcItKey");
@@ -362,19 +382,22 @@ export default function Home() {
         <aside className="w-64 bg-gray-100 border-r border-gray-300 p-4 flex flex-col gap-4 shadow-lg">
           <h3 className="font-bold text-blue-800 mb-2">Group Members</h3>
           <ul className="flex-1 overflow-y-auto space-y-2">
-            {members.map((m) => (
-              <li key={m.id} className="flex items-center gap-2 p-2 rounded hover:bg-gray-200">
-                <img src={m.avatar_url} alt={m.github_username} className="w-8 h-8 rounded-full border border-gray-400" />
-                <span className="flex-1 font-mono text-sm">{m.github_username}</span>
-                <button
-                  className="ml-1 p-1 rounded hover:bg-gray-300"
-                  title="View public key"
-                  onClick={() => handleOpenKeyModal(m)}
-                >
-                  <span className="text-lg" role="img" aria-label="key">🔑</span>
-                </button>
-              </li>
-            ))}
+            {members
+              .slice() // copy to avoid mutating state
+              .sort((a, b) => a.github_username.localeCompare(b.github_username))
+              .map((m) => (
+                <li key={m.id} className="flex items-center gap-2 p-2 rounded hover:bg-gray-200">
+                  <img src={m.avatar_url} alt={m.github_username} className="w-8 h-8 rounded-full border border-gray-400" />
+                  <span className="flex-1 font-mono text-sm">{m.github_username}</span>
+                  <button
+                    className="ml-1 p-1 rounded hover:bg-gray-300"
+                    title="View public key"
+                    onClick={() => handleOpenKeyModal(m)}
+                  >
+                    <span className="text-lg" role="img" aria-label="key">🔑</span>
+                  </button>
+                </li>
+              ))}
           </ul>
         </aside>
         {/* Main Feed Area */}
@@ -484,11 +507,87 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
             <h2 className="text-xl font-bold mb-4">Verify Group Signature</h2>
-            <div className="mb-2">Signature valid: <span className="text-green-600 font-semibold">Yes</span></div>
-            <div className="mb-2">Public signal: <span className="font-mono">dummy-signal</span></div>
-            <div className="mb-2">Merkle root: <span className="font-mono">dummy-root</span></div>
-            <div className="mb-2">Circuit/proof ID: <span className="font-mono">dummy-circuit</span></div>
-            <div className="mb-2">Time posted: <span className="font-mono">{verifyRequest.created_at}</span></div>
+            {/* Show request info */}
+            <div className="mb-2">
+              <span className="font-bold">Emoji:</span> <span className="text-2xl">{verifyRequest.emoji}</span>
+            </div>
+            <div className="mb-2">
+              <span className="font-bold">Description:</span> {verifyRequest.description}
+            </div>
+            <div className="mb-4">
+              <span className="font-bold">Group Members:</span>
+              <ul className="list-none ml-0 text-sm">
+                {Array.isArray(verifyRequest.group_members) && verifyRequest.group_members.length > 0 ? (
+                  verifyRequest.group_members.map((username: string, idx: number) => (
+                    <li key={idx} className="flex items-center gap-2 py-1">
+                      <img
+                        src={`https://github.com/${username}.png`}
+                        alt={username}
+                        className="w-6 h-6 rounded-full border border-gray-300"
+                      />
+                      <span className="font-mono">{username}</span>
+                      <a
+                        href={`https://github.com/${username}.keys`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2 py-0.5 bg-gray-200 rounded text-xs hover:bg-blue-100 ml-1 flex items-center gap-1"
+                      >
+                        Verify Key
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1.25em" height="1.25em" viewBox="0 0 20 20" fill="none"><path d="M7 13L13 7M13 7H8M13 7V12" stroke="#1a237e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </a>
+                    </li>
+                  ))
+                ) : (
+                  <li className="italic text-gray-500">No group members listed</li>
+                )}
+              </ul>
+            </div>
+            {/* Raw signature with copy button */}
+            <div className="mb-4">
+              <div className="flex items-center mb-1">
+                <span className="font-bold">Raw Signature:</span>
+                <button
+                  className="ml-2 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                  onClick={() => {
+                    if (verifyRequest.signature) {
+                      navigator.clipboard.writeText(verifyRequest.signature);
+                    }
+                  }}
+                  disabled={!verifyRequest.signature}
+                >
+                  Copy
+                </button>
+              </div>
+              <pre className="font-mono bg-gray-100 rounded px-2 py-1 block whitespace-pre-wrap break-words max-w-full">
+                {(() => {
+                  if (typeof verifyRequest.signature !== 'string') return "N/A";
+                  const lines = verifyRequest.signature.split('\n').filter(Boolean);
+                  if (lines.length < 4) return lines.join('\n');
+                  const maxLen = 33;
+                  return [
+                    lines[0],
+                    lines[1].slice(0, maxLen),
+                    '...',
+                    lines[lines.length - 2].slice(-maxLen),
+                    lines[lines.length - 1]
+                  ].join('\n');
+                })()}
+              </pre>
+            </div>
+            <div className="mb-4">
+              <Button variant="default" onClick={handleVerifySignature}>
+                Verify Signature
+              </Button>
+            </div>
+            {verifyResult && (
+              <div className="mb-4">
+                <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+{verifyResult.valid
+  ? `Signature is valid!\nGroup keys:\n${verifyResult.groupKeys}`
+  : `Invalid signature: ${verifyResult.error?.message || String(verifyResult.error)}`}
+                </pre>
+              </div>
+            )}
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" onClick={handleCloseVerify}>Close</Button>
             </div>
