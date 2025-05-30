@@ -27,6 +27,12 @@ export default function AdminPage() {
   const [addUsername, setAddUsername] = useState("");
   const [adminMsg, setAdminMsg] = useState<string | null>(null);
 
+  // Admins state
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [addAdminUsername, setAddAdminUsername] = useState("");
+  const [adminAdminMsg, setAdminAdminMsg] = useState<string | null>(null);
+
   // Fetch requests
   const fetchRequests = async () => {
     setRequestsLoading(true);
@@ -127,10 +133,94 @@ export default function AdminPage() {
     setMemberLoading(false);
   };
 
+  // Fetch admins
+  const fetchAdmins = async () => {
+    setAdminLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("admins")
+        .select("id, github_username, public_key");
+      if (error) {
+        setAdmins([]);
+      } else {
+        setAdmins(data || []);
+      }
+    } catch (e) {
+      setAdmins([]);
+    }
+    setAdminLoading(false);
+  };
+
+  // Add admin
+  const handleAddAdmin = async () => {
+    setAdminAdminMsg(null);
+    if (!addAdminUsername.trim()) {
+      setAdminAdminMsg("Please enter a GitHub username.");
+      return;
+    }
+    setAdminLoading(true);
+    try {
+      const username = addAdminUsername.trim();
+      const keysResp = await fetch(`/api/github-keys?username=${encodeURIComponent(username)}`);
+      const keysData = await keysResp.json();
+      if (!keysResp.ok) {
+        setAdminAdminMsg(keysData.error || "Failed to fetch keys for this user.");
+        setAdminLoading(false);
+        return;
+      }
+      const public_key = (keysData.keys || []).find((k: string) => k.startsWith("ssh-rsa ")) || "";
+      if (!public_key) {
+        setAdminAdminMsg("No ssh-rsa public key found for this GitHub user.");
+        setAdminLoading(false);
+        return;
+      }
+      // Prevent duplicate
+      if (admins.some((a) => a.public_key === public_key)) {
+        setAdminAdminMsg("This user is already an admin.");
+        setAdminLoading(false);
+        return;
+      }
+      const { error } = await supabase.from("admins").insert({
+        github_username: username,
+        public_key,
+      });
+      if (error) {
+        setAdminAdminMsg("Failed to add admin: " + error.message);
+      } else {
+        setAdminAdminMsg("Admin added successfully.");
+        setAddAdminUsername("");
+        fetchAdmins();
+      }
+    } catch (e) {
+      setAdminAdminMsg("Unexpected error adding admin.");
+    }
+    setAdminLoading(false);
+  };
+
+  // Remove admin
+  const handleRemoveAdmin = async (id: string, public_key: string) => {
+    setAdminAdminMsg(null);
+    setAdminLoading(true);
+    try {
+      if (public_key === userPubKey) {
+        setAdminAdminMsg("You cannot remove yourself as admin.");
+        setAdminLoading(false);
+        return;
+      }
+      await supabase.from("admins").delete().eq("id", id);
+      fetchAdmins();
+      setAdminAdminMsg("Admin removed successfully.");
+    } catch (e) {
+      setAdminAdminMsg("Unexpected error removing admin.");
+    }
+    setAdminLoading(false);
+  };
+
   // Fetch data on mount for everyone
   useEffect(() => {
     fetchRequests();
     fetchMembers();
+    fetchAdmins();
   }, []);
 
   const handleLogin = async (key: string, pubKey: string) => {
@@ -189,7 +279,9 @@ export default function AdminPage() {
           </div>
         )}
         <div className="bg-white border-2 border-gray-400 rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold mb-4">Office Requests</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold">Office Requests</h2>
+          </div>
           {requestsLoading ? (
             <div>Loading requests...</div>
           ) : requests.length === 0 ? (
@@ -247,6 +339,47 @@ export default function AdminPage() {
                     onClick={() => handleRemoveMember(m.id)}
                     disabled={!isAdmin || memberLoading}
                     className={`${!isAdmin || memberLoading ? 'opacity-60 grayscale cursor-not-allowed' : ''}`}
+                  >
+                    Remove
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="bg-white border-2 border-gray-400 rounded-lg shadow p-6">
+          <h2 className="text-2xl font-bold mb-4">Admins</h2>
+          <div className="flex gap-2 mb-4">
+            <input
+              className={`border rounded p-2 flex-1 ${!isAdmin || adminLoading ? 'bg-gray-200 text-gray-500 border-gray-300 cursor-not-allowed' : ''}`}
+              placeholder="GitHub username"
+              value={addAdminUsername}
+              onChange={e => setAddAdminUsername(e.target.value)}
+              disabled={!isAdmin || adminLoading}
+            />
+            <Button
+              onClick={handleAddAdmin}
+              disabled={!isAdmin || adminLoading}
+              className={`${!isAdmin || adminLoading ? 'opacity-60 grayscale cursor-not-allowed' : ''}`}
+            >
+              Add
+            </Button>
+          </div>
+          {adminAdminMsg && <div className={`mb-2 text-sm font-semibold ${adminAdminMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{adminAdminMsg}</div>}
+          {adminLoading ? (
+            <div>Loading...</div>
+          ) : (
+            <ul className="space-y-2">
+              {admins.map((a) => (
+                <li key={a.id} className="flex items-center gap-2 border-b pb-1">
+                  <span className="font-mono text-xs bg-gray-100 rounded px-2 py-1">{a.github_username || 'N/A'}</span>
+                  <span className="flex-1 truncate text-xs text-gray-700">{a.public_key.slice(0, 32)}...{a.public_key.slice(-16)}</span>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleRemoveAdmin(a.id, a.public_key)}
+                    disabled={!isAdmin || adminLoading || a.public_key === userPubKey}
+                    className={`${!isAdmin || adminLoading || a.public_key === userPubKey ? 'opacity-60 grayscale cursor-not-allowed' : ''}`}
                   >
                     Remove
                   </Button>

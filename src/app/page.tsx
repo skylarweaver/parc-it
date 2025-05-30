@@ -410,7 +410,18 @@ export default function Home() {
           </section>
           {/* Request Feed */}
           <div className="w-full max-w-xl mb-20">
-            <h2 className="text-lg font-bold mb-4">Office Requests</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">Office Requests</h2>
+              <button
+                className="ml-4 px-4 py-2 bg-[#1a237e] hover:bg-blue-800 text-white font-bold rounded border-2 border-gray-400 shadow retro-btn"
+                onClick={() => loggedIn && setAddRequestOpen(true)}
+                disabled={!loggedIn}
+                title={loggedIn ? "Submit a new office request" : "Log in to submit a request"}
+                style={{ minWidth: 120, filter: !loggedIn ? 'grayscale(80%) opacity(0.5)' : 'none', cursor: !loggedIn ? 'not-allowed' : 'pointer' }}
+              >
+                + Add Request
+              </button>
+            </div>
             {requestsLoading ? (
               <div>Loading requests...</div>
             ) : requests.length === 0 ? (
@@ -429,16 +440,6 @@ export default function Home() {
           </div>
         </main>
       </div>
-      {/* Large Add Request Button (bottom left) */}
-      <button
-        className="fixed bottom-8 left-8 z-50 w-20 h-20 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-2xl border-4 border-gray-700 flex items-center justify-center text-5xl font-bold retro-btn"
-        onClick={() => loggedIn && setAddRequestOpen(true)}
-        disabled={!loggedIn}
-        title={loggedIn ? "Submit a new office request" : "Log in to submit a request"}
-        style={{ filter: !loggedIn ? 'grayscale(80%) opacity(0.5)' : 'none', cursor: !loggedIn ? 'not-allowed' : 'pointer' }}
-      >
-        +
-      </button>
       {/* Modals (Key, Add Request, Verify) remain unchanged */}
       {addRequestOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
