@@ -260,6 +260,7 @@ export default function AdminPage() {
         isOpen={loginOpen}
         onClose={() => setLoginOpen(false)}
         onLogin={handleLogin}
+        groupPublicKeys={members.map(m => m.public_key).join('\n')}
         admin={true}
       />
     </div>

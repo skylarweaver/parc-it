@@ -486,6 +486,8 @@ export default function Home() {
         isOpen={loginOpen}
         onClose={() => setLoginOpen(false)}
         onLogin={handleLogin}
+        groupPublicKeys={members.map(m => m.public_key).join('\n')}
+        admin={isAdmin}
       />
     </div>
   );

@@ -576,8 +576,64 @@ CREATE TABLE comments (
 - Custom copy is present and clearly explains the app's purpose and cryptographic anonymity
 - All content and UI is relevant to Parc-It! and the 0xPARC office 
 
+# Plonky2/WASM Cryptography Integration Plan
 
+## Background and Motivation
 
+The project needs to integrate cryptographic group signature functionality (Plonky2 circuits, WASM-compiled Rust) from the double-blind-web package into the Next.js (parc-it) app. This will allow:
+- Verifying if a user's "parcit key" (DK) is in the group (front-end verification only)
+- Deriving the SSH key from the parcit key / DK
+- Generating a valid signature for a request
+- Verifying a signature and outputting the message and group keys (GitHub users) in the request verification modal
+
+## Key Challenges and Analysis
+- WASM modules must be loaded asynchronously and only in the browser (not during SSR)
+- The cryptographic API must be easy to use from React components
+- Helper functions should be organized for maintainability and clarity
+- TypeScript types may need to be inferred or stubbed for WASM exports
+
+## High-level Task Breakdown
+
+1. **Copy WASM package files**
+   - Place `double_blind_web.js`, `double_blind_web_bg.wasm`, and any required files from double-blind-web/pkg into `src/helpers/doubleBlind/` in the parc-it app.
+   - Success: Files are present and importable in the Next.js app.
+
+2. **Create WASM loader and API helper**
+   - Implement `src/helpers/doubleBlind/plonky2.ts` (or .js) with:
+     - `export async function initPlonkyTwoCircuits()` that loads and initializes the WASM module, returning the needed classes/functions (`Circuit`, `validate_keys`, etc.).
+     - Ensure singleton pattern so WASM is only loaded once per session.
+   - Success: Can call `initPlonkyTwoCircuits()` from a component and receive usable cryptographic functions.
+
+3. **Implement utility functions for app use cases**
+   - In the same helper, export async functions:
+     - `verifyDKInGroup(publicKeys: string, dk: string): Promise<boolean>`
+     - `generateSignature(message: string, publicKeys: string, dk: string): Promise<string>`
+     - `verifySignature(message: string, signature: string): Promise<{valid: boolean, groupKeys?: string, error?: any}>`
+     - (Optional) `deriveSSHKeyFromDK(dk: string): Promise<string>` if supported by WASM
+   - Success: Each function works as expected in isolation (unit test or manual test)
+
+4. **Integrate into React components**
+   - Use the helper functions in relevant Next.js pages/components:
+     - DK verification on input
+     - Signature generation on request submission
+     - Signature verification in modal
+   - Success: UI updates correctly based on cryptographic results; errors are handled gracefully.
+
+5. **Testing and validation**
+   - Test all flows manually and/or with automated tests
+   - Success: All cryptographic features work in the browser, no SSR errors, and user experience is smooth.
+
+## Project Status Board (Plonky2 Integration)
+
+- [x] Copy WASM package files to helpers folder
+- [x] Implement `initPlonkyTwoCircuits` loader and API
+- [x] Implement utility functions for DK verification, signature generation, and verification
+- [ ] Integrate cryptographic helpers into React components
+- [ ] Test and validate all cryptographic flows
+
+## Executor's Feedback or Assistance Requests (Plonky2 Integration)
+
+- Created `src/helpers/plonky2/utils.ts` with async utility functions: `verifyDKInGroup`, `generateSignature`, and `verifySignature`. All use the typed loader and are ready for integration into React components.
 
 Skylar todos DO NO TOUCH:
 - add refresh of group members keys from github

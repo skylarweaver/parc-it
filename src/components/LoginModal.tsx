@@ -1,35 +1,41 @@
 import React, { useState } from "react";
 import { Button } from "./ui/button";
-import { extractPublicKeyFromSignature, validateParcItKey } from "../helpers/parcItKey";
-
-const EXPECTED_MESSAGE = 14447023197094784173331616578829287000074783130802912942914027114823662617007553911501158244718575362051758829289159984830457466395841150324770159971462582912755545324694933673046215187947905307019469n; // double-blind base message
+import { getDKGroupCheck } from "../helpers/plonky2/utils";
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogin: (key: string, pubKey: string) => void;
+  groupPublicKeys: string;
   admin?: boolean;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, admin }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, groupPublicKeys, admin }) => {
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
 
   if (!isOpen) return null;
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError("");
-    const pubKey = extractPublicKeyFromSignature(key);
-    if (!pubKey || pubKey.startsWith("ERROR")) {
-      setError("Could not extract a valid SSH public key from the signature.");
+    if (!groupPublicKeys || typeof groupPublicKeys !== 'string' || groupPublicKeys.length === 0) {
+      setError("No group public keys are loaded. Please contact an admin.");
       return;
     }
-    const valid = validateParcItKey(key, EXPECTED_MESSAGE);
-    if (!valid) {
-      setError("Signature is not valid for the expected message. Please check your Parc-It key.");
-      return;
+    try {
+      const result = await getDKGroupCheck(groupPublicKeys, key);
+      const idx = result.user_public_key_index;
+      const groupKeysArray = groupPublicKeys.split('\n');
+      console.log({ groupPublicKeys, groupKeysArray, idx, result });
+      if (idx === undefined || idx < 0 || idx >= groupKeysArray.length) {
+        setError("Your Parc-It key is recognized, but the associated public key could not be found in the group.");
+        return;
+      }
+      const userPubKey = groupKeysArray[idx];
+      onLogin(key, userPubKey);
+    } catch (e) {
+      setError("Error checking group membership: " + (e instanceof Error ? e.message : String(e)));
     }
-    onLogin(key, pubKey);
   };
 
   return (
