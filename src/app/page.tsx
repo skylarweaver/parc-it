@@ -9,6 +9,7 @@ import { Switch } from "../components/ui/switch";
 import EmojiPicker, { Theme, EmojiStyle } from 'emoji-picker-react';
 import ProgressBar from "../components/ui/ProgressBar";
 import PLONKY2_SCRIPT from "./helpers/plonky2/plonky2Script";
+import RetroHeader from "../components/RetroHeader";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -92,8 +93,8 @@ function SpeedReader({ script, loading }: { script: string, loading: boolean }) 
   const [wpm, setWpm] = React.useState(100);
   const [maxWpm, setMaxWpm] = React.useState(300);
   const [paused, setPaused] = React.useState(false);
-  const [showControls, setShowControls] = React.useState(false);
-  const rampUpTime = 5; // seconds to reach target speed
+  const [showControls, setShowControls] = React.useState(true);
+  const rampUpTime = 10; // seconds to reach target speed
   const minWpm = 100;
   const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
   const controlsTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -110,11 +111,8 @@ function SpeedReader({ script, loading }: { script: string, loading: boolean }) 
     setWpm(minWpm);
     setMaxWpm(300);
     setPaused(false);
-    setShowControls(false);
+    setShowControls(true); // Controls are now always shown immediately
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    if (loading) {
-      controlsTimeoutRef.current = setTimeout(() => setShowControls(true), 10000);
-    }
   }, [script, loading]);
 
   // Animate word display
@@ -157,8 +155,6 @@ function SpeedReader({ script, loading }: { script: string, loading: boolean }) 
         aria-label={paused ? 'Resume' : 'Pause'}
         onClick={() => {
           setPaused(p => !p);
-          // TODO: Remove this log
-          console.log(paused ? 'SpeedReader: Resume' : 'SpeedReader: Pause');
         }}
         className="text-gray-600 hover:text-gray-900 text-lg px-2 py-1 rounded-full bg-gray-200 hover:bg-gray-300 shadow transition-all focus:outline-none"
         style={{ minWidth: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -256,6 +252,10 @@ export default function Home() {
   const [admins, setAdmins] = React.useState<any[]>([]);
   const [verifyLoading, setVerifyLoading] = React.useState(false);
   const verifyResultCache = React.useRef<Record<string, {valid: boolean, groupKeys?: string, error?: any}>>({});
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(10);
+  const [totalRequests, setTotalRequests] = React.useState(0);
+  const [signatureLoading, setSignatureLoading] = React.useState(false);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -410,6 +410,9 @@ export default function Home() {
     if (addRequestOpen && selectedGroup.length === 0 && members.length > 0) {
       setSelectedGroup(members.map((m) => m.github_username));
     }
+    // Reset request modal state (message, loading) whenever modal is opened or closed
+    setRequestMsg(null);
+    setRequestLoading(false);
     // eslint-disable-next-line
   }, [addRequestOpen]);
 
@@ -436,40 +439,67 @@ export default function Home() {
         return;
       }
     }
-    setRequestLoading(true);
-    try {
-      // Determine group_members and doxxed_member_id
-      let groupMembers: string[] = [];
-      let doxxedMemberId: string | null = null;
-      if (isDoxxed) {
+    // DOXXED: Fast path, no loading, no proof UI, auto-close modal
+    if (isDoxxed) {
+      try {
         const self = members.find(m => m.public_key === userPubKey);
         if (!self) {
           setRequestMsg("Could not find your group member info for doxxed request.");
-          setRequestLoading(false);
           return;
         }
-        groupMembers = [self.github_username];
-        doxxedMemberId = self.id;
-      } else {
-        groupMembers = selectedGroup;
-        doxxedMemberId = null;
+        const groupMembers = [self.github_username];
+        const doxxedMemberId = self.id;
+        const { error } = await supabase.from("office_requests").insert({
+          emoji: requestEmoji.trim(),
+          description: requestDesc.trim(),
+          signature: null,
+          group_id: "00000000-0000-0000-0000-000000000000", // TODO: real group logic
+          public_signal: "dummy-signal", // TODO: real signal
+          group_members: groupMembers,
+          doxxed_member_id: doxxedMemberId,
+          deleted: false,
+          metadata: {},
+        });
+        if (error) {
+          let msg = "Failed to submit request: " + error.message;
+          if (error instanceof Error) {
+            msg = error.message;
+          }
+          setRequestMsg(msg);
+        } else {
+          setRequestMsg("Request submitted!");
+          setRequestEmoji("");
+          setRequestDesc("");
+          setTimeout(() => {
+            setAddRequestOpen(false);
+            setRequestMsg(null);
+          }, 1000);
+        }
+      } catch (e) {
+        let msg = "Unexpected error submitting request.";
+        if (e instanceof Error) {
+          msg = e.message;
+        }
+        setRequestMsg(msg);
+        console.error(e);
       }
-      // Build message and group keys
+      return;
+    }
+    // ANONYMOUS: Existing flow (with loading/progress/proof UI)
+    setRequestLoading(true);
+    try {
+      let groupMembers = selectedGroup;
+      let doxxedMemberId = null;
       const message = `${requestEmoji} ${requestDesc}`;
       const groupKeys = members
         .filter((m) => groupMembers.includes(m.github_username))
         .map((m) => m.public_key)
         .join('\n');
-      // Generate signature only if anonymous
-      let signature = null;
-      if (!isDoxxed) {
-        signature = await generateSignature(message, groupKeys, parcItKey);
-      }
-      // Submit request with signature (or null)
+      let signature = await generateSignature(message, groupKeys, parcItKey);
       const { error } = await supabase.from("office_requests").insert({
         emoji: requestEmoji.trim(),
         description: requestDesc.trim(),
-        signature, // null for doxxed, real signature for anonymous
+        signature,
         group_id: "00000000-0000-0000-0000-000000000000", // TODO: real group logic
         public_signal: "dummy-signal", // TODO: real signal
         group_members: groupMembers,
@@ -488,18 +518,10 @@ export default function Home() {
         }
         setRequestMsg(msg);
       } else {
-        if (isDoxxed) {
-          setRequestMsg("Proof Generated ✅");
-        } else {
-          setRequestMsg("Your proof has been generated and is ready to use.");
-        }
+        setRequestMsg("Your proof has been generated and is ready to use.");
         setRequestEmoji("");
         setRequestDesc("");
         // Do NOT close the modal automatically; let the user close it
-        // setTimeout(() => {
-        //   setAddRequestOpen(false);
-        //   setRequestMsg(null);
-        // }, 1000);
       }
     } catch (e) {
       let msg = "Unexpected error submitting request.";
@@ -516,48 +538,79 @@ export default function Home() {
     setRequestLoading(false);
   };
 
-  // Fetch requests from Supabase
-  const fetchRequests = async () => {
+  // Fetch requests from Supabase (with pagination)
+  const fetchRequests = async (page = currentPage, size = pageSize) => {
     setRequestsLoading(true);
     try {
-      const { data, error } = await supabase
+      const from = (page - 1) * size;
+      const to = from + size - 1;
+      const { data, error, count } = await supabase
         .from("office_requests")
-        .select("id, emoji, description, created_at, deleted, group_members, signature, doxxed_member_id")
-        .order("created_at", { ascending: false });
+        .select("id, emoji, description, created_at, deleted, group_members, doxxed_member_id", { count: "exact" })
+        .eq('deleted', false)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      console.log('fetchRequests', { page, size, from, to, data, count, error });
       if (error) {
         console.error("Failed to fetch requests:", error);
         setRequests([]);
+        setTotalRequests(0);
       } else {
-        setRequests((data || []).filter((r: any) => !r.deleted));
+        setRequests(data || []);
+        setTotalRequests(count || 0);
       }
     } catch (e) {
       console.error("Unexpected error fetching requests:", e);
       setRequests([]);
+      setTotalRequests(0);
     }
     setRequestsLoading(false);
   };
 
-  // Fetch requests on mount and after modal closes
-  useEffect(() => {
-    fetchRequests();
-  }, []);
+  // Replace with a single effect:
   useEffect(() => {
     if (!addRequestOpen) {
-      fetchRequests();
+      fetchRequests(currentPage, pageSize);
     }
-  }, [addRequestOpen]);
+  }, [currentPage, pageSize, addRequestOpen]);
 
   // Open verify modal for a request
-  const handleOpenVerify = (req: any) => {
-    setVerifyRequest(req);
-    // Use request.id if available, else fallback to signature as key
-    const cacheKey = req.id || req.signature || '';
-    if (verifyResultCache.current[cacheKey]) {
-      setVerifyResult(verifyResultCache.current[cacheKey]);
+  const handleOpenVerify = async (req: any) => {
+    if (req.signature) {
+      setVerifyRequest(req);
+      const cacheKey = req.id || req.signature || '';
+      if (verifyResultCache.current[cacheKey]) {
+        setVerifyResult(verifyResultCache.current[cacheKey]);
+      } else {
+        setVerifyResult(null);
+      }
+      setSignatureLoading(false);
+      setVerifyModalOpen(true);
     } else {
-      setVerifyResult(null);
+      // Open modal immediately with loading state
+      setVerifyRequest(req);
+      setSignatureLoading(true);
+      setVerifyModalOpen(true);
+      // Fetch the full request with signature
+      const { data, error } = await supabase
+        .from("office_requests")
+        .select("id, emoji, description, created_at, deleted, group_members, doxxed_member_id, signature")
+        .eq("id", req.id)
+        .single();
+      if (error) {
+        alert("Failed to fetch signature for this request.");
+        setSignatureLoading(false);
+        return;
+      }
+      setVerifyRequest(data);
+      const cacheKey = data.id || data.signature || '';
+      if (verifyResultCache.current[cacheKey]) {
+        setVerifyResult(verifyResultCache.current[cacheKey]);
+      } else {
+        setVerifyResult(null);
+      }
+      setSignatureLoading(false);
     }
-    setVerifyModalOpen(true);
   };
   const handleCloseVerify = () => {
     setVerifyModalOpen(false);
@@ -649,47 +702,28 @@ export default function Home() {
   }, [showEmojiPicker]);
 
   return (
-    <div className="relative min-h-screen bg-gray-200 font-sans">
-      {/* Title Bar/Header (Retro Windows 95 style) */}
-      <header className="w-full flex items-center bg-[#1a237e] text-white px-4 py-2 border-b-4 border-gray-400 shadow-lg relative">
-        <span className="font-bold text-xl mr-4">📝 Parc-It</span>
-        <span className="ml-2 text-sm font-mono tracking-tight">Anonymous Office Request Board for 0xPARC</span>
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-          <a href="/admin" className="underline text-xs text-white hover:text-blue-200 mr-4">Admin Portal</a>
-          {!loggedIn ? (
-            <button
-              className="px-4 py-2 bg-white text-[#1a237e] font-bold rounded border-2 border-gray-400 shadow active:translate-y-0.5 active:shadow-none transition-all retro-btn ml-2 my-1"
-              onClick={() => setLoginOpen(true)}
-              disabled={loading}
-              style={{ minWidth: 160 }}
-            >
-              {loading ? "Logging in..." : "Login with Parc-It Key"}
-            </button>
-          ) : (
-            <>
-              <span className="font-mono text-xs bg-gray-100 text-[#1a237e] px-2 py-1 rounded border border-gray-300">Logged in</span>
-              <button
-                className="px-3 py-1 bg-gray-300 text-[#1a237e] font-bold rounded border-2 border-gray-400 shadow active:translate-y-0.5 active:shadow-none transition-all retro-btn"
-                onClick={() => { setLoggedIn(false); setUserPubKey(null); setIsAdmin(false); localStorage.removeItem('parcItKey'); localStorage.removeItem('parcItPubKey'); }}
-              >
-                Logout
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+    <div className="retro-container">
+      <RetroHeader 
+        setLoginOpen={setLoginOpen}
+        loggedIn={loggedIn}
+        loading={loading}
+        isAdmin={isAdmin}
+        setLoggedIn={setLoggedIn}
+        setUserPubKey={setUserPubKey}
+        setIsAdmin={setIsAdmin}
+      />
       {/* Main Layout: Sidebar + Feed */}
-      <div className="flex flex-row w-full max-w-7xl mx-auto mt-8">
+      <div className="flex flex-row max-w-7xl mx-auto mt-8">
         {/* Sidebar: Group Members */}
         <aside className="w-64 bg-gray-100 border-r border-gray-300 p-4 flex flex-col gap-4 shadow-lg">
-          <h3 className="font-bold text-blue-800 mb-2">Group Members</h3>
-          <ul className="flex-1 overflow-y-auto space-y-2">
+          <h3 className="font-bold text-blue-800 mb-2">0XPARC Group Members</h3>
+          <ul className="overflow-y-auto space-y-2">
             {members
               .slice() // copy to avoid mutating state
               .sort((a, b) => a.github_username.localeCompare(b.github_username))
               .map((m) => (
                 <li key={m.id} className="flex items-center gap-2 p-2 rounded hover:bg-gray-200">
-                  <img src={m.avatar_url} alt={m.github_username} className="w-8 h-8 rounded-full border border-gray-400" />
+                  <img src={m.avatar_url} alt={m.github_username} className="retro-avatar" />
                   <span className="flex-1 font-mono text-sm">{m.github_username}</span>
                   <button
                     className="ml-1 p-1 rounded hover:bg-gray-300"
@@ -719,17 +753,18 @@ export default function Home() {
         {/* Main Feed Area */}
         <main className="flex-1 flex flex-col items-center px-8">
           {/* Custom Copy/Intro */}
-          <section className="w-full max-w-2xl mt-8 mb-8 bg-white border-2 border-gray-400 rounded-lg shadow p-6">
-            <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">📝 Parc-It <span className="text-purple-500">✦</span></h1>
-            <p className="mb-2 text-lg">Every suggestion here was posted by a member of 0xPARC—but we don't know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
+          <section className="w-full max-w-2xl mt-8 mb-8 bg-white border-2 border-gray-400  shadow p-6">
+            <h1 className="retro-title mb-2 flex items-center gap-2">📝 Parc-It <span className="text-purple-500">✦</span></h1>
+            <p className="retro-subtitle mb-2 text-lg">Every suggestion here was posted by a member of 0xPARC—but we don't know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
             <p className="text-sm text-gray-700">Submit requests for the office anonymously. Only group members can post, but no one (not even admins) can see who posted what.</p>
+            <span className="blinking">✨ Verified by ZK Proofs ✨</span>
           </section>
           {/* Request Feed */}
           <div className="w-full max-w-xl mb-20">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Office Requests</h2>
               <button
-                className="ml-4 px-4 py-2 bg-[#1a237e] hover:bg-blue-800 text-white font-bold rounded border-2 border-gray-400 shadow retro-btn"
+                className="ml-4 px-4 py-2 bg-[#1a237e] hover:bg-blue-800 text-white font-bold rounded border-2 border-gray-400 shadow"
                 onClick={() => loggedIn && setAddRequestOpen(true)}
                 disabled={!loggedIn}
                 title={loggedIn ? "Submit a new office request" : "Log in to submit a request"}
@@ -743,42 +778,92 @@ export default function Home() {
             ) : requests.length === 0 ? (
               <div className="text-gray-500">No requests yet.</div>
             ) : (
-              <ul className="space-y-4">
-                {requests.map((req) => {
-                  // Find group member objects for avatars
-                  const groupMemberObjs = Array.isArray(req.group_members)
-                    ? members.filter(m => req.group_members.includes(m.github_username))
-                    : [];
-                  const isDoxxed = !!req.doxxed_member_id;
-                  return (
-                    <li key={req.id} className="border-2 border-gray-400 rounded-lg p-4 bg-white shadow-sm">
-                      <div className="flex items-center gap-4">
-                        <span className="text-3xl w-10 text-center">{req.emoji}</span>
-                        <span className="flex-1 font-bold text-lg flex items-center gap-2">
-                          {req.description}
-                          <span className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 ${isDoxxed ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-gray-200 text-gray-700 border border-gray-300'}`}>{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
-                        </span>
-                        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2 ml-14">
-                        {groupMemberObjs.slice(0, 5).map((m, idx) => (
-                          <img
-                            key={m.id}
-                            src={m.avatar_url}
-                            alt={m.github_username}
-                            title={m.github_username}
-                            className="w-7 h-7 rounded-full border-2 border-white shadow -ml-2 first:ml-0"
-                            style={{ zIndex: 10 - idx }}
-                          />
-                        ))}
-                        {groupMemberObjs.length > 5 && (
-                          <span className="ml-1 px-2 py-0.5 bg-gray-200 text-xs rounded-full border border-gray-400 font-mono">+{groupMemberObjs.length - 5} more</span>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                <ul className="space-y-4">
+                  {requests.map((req) => {
+                    // Find group member objects for avatars
+                    const groupMemberObjs = Array.isArray(req.group_members)
+                      ? members.filter(m => req.group_members.includes(m.github_username))
+                      : [];
+                    const isDoxxed = !!req.doxxed_member_id;
+                    return (
+                      <li key={req.id} className="border-2 border-gray-400  p-4 bg-white shadow-sm">
+                        <div className="flex items-center gap-4">
+                          <span className="text-3xl w-10 text-center">{req.emoji}</span>
+                          <span className="flex-1 flex items-center gap-2">
+                            <span className="retro-text">{req.description}</span>
+                            <span className="retro-label flex items-center gap-1">{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
+                          </span>
+                          <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 ml-14">
+                          {groupMemberObjs.slice(0, 5).map((m, idx) => (
+                            <img
+                              key={m.id}
+                              src={m.avatar_url}
+                              alt={m.github_username}
+                              title={m.github_username}
+                              className="retro-avatar -ml-2 first:ml-0"
+                              style={{ zIndex: 10 - idx }}
+                            />
+                          ))}
+                          {groupMemberObjs.length > 5 && (
+                            <span className="ml-1 px-2 py-0.5 bg-gray-200 text-xs rounded-full border border-gray-400 font-mono">+{groupMemberObjs.length - 5} more</span>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {/* Pagination Controls */}
+                <div className="flex justify-center items-center mt-6 gap-2">
+                  <button
+                    className="retro-btn px-3 py-1"
+                    onClick={() => {
+                      if (currentPage > 1) {
+                        setCurrentPage(currentPage - 1);
+                        fetchRequests(currentPage - 1, pageSize);
+                      }
+                    }}
+                    disabled={currentPage === 1}
+                    style={{ minWidth: 40 }}
+                  >
+                    &#8592; Prev
+                  </button>
+                  {/* Page Numbers */}
+                  {Array.from({ length: Math.ceil(totalRequests / pageSize) }, (_, i) => i + 1).map(pageNum => (
+                    <button
+                      key={pageNum}
+                      className={`retro-btn px-3 py-1 ${pageNum === currentPage ? 'bg-blue-200 border-blue-700' : ''}`}
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        fetchRequests(pageNum, pageSize);
+                      }}
+                      disabled={pageNum === currentPage}
+                      style={{ minWidth: 32 }}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                  <button
+                    className="retro-btn px-3 py-1"
+                    onClick={() => {
+                      const totalPages = Math.ceil(totalRequests / pageSize);
+                      if (currentPage < totalPages) {
+                        setCurrentPage(currentPage + 1);
+                        fetchRequests(currentPage + 1, pageSize);
+                      }
+                    }}
+                    disabled={currentPage === Math.ceil(totalRequests / pageSize) || totalRequests === 0}
+                    style={{ minWidth: 40 }}
+                  >
+                    Next &#8594;
+                  </button>
+                  <span className="ml-4 text-xs text-gray-600 font-mono">
+                    Page {currentPage} of {Math.max(1, Math.ceil(totalRequests / pageSize))}
+                  </span>
+                </div>
+              </>
             )}
           </div>
         </main>
@@ -786,7 +871,7 @@ export default function Home() {
       {/* Modals (Key, Add Request, Verify) remain unchanged */}
       {addRequestOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
+          <div className="bg-white  shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
             <h2 className="text-xl font-bold mb-4">New Office Request</h2>
             {/* Toggle for Anonymous/Doxxed */}
             <div className="mb-4">
@@ -820,7 +905,7 @@ export default function Home() {
                 <img
                   src={members.find(m => m.public_key === userPubKey)?.avatar_url || ""}
                   alt={members.find(m => m.public_key === userPubKey)?.github_username || ""}
-                  className="w-6 h-6 rounded-full border border-gray-300"
+                  className="retro-avatar"
                 />
                 <span className="font-mono text-xs">{members.find(m => m.public_key === userPubKey)?.github_username || "Unknown"}</span>
               </div>
@@ -885,7 +970,7 @@ export default function Home() {
                       }}
                       disabled={requestLoading || (isDoxxed && m.public_key !== userPubKey)}
                     />
-                    <img src={m.avatar_url} alt={m.github_username} className="w-6 h-6 rounded-full border border-gray-300" />
+                    <img src={m.avatar_url} alt={m.github_username} className="retro-avatar" />
                     <span className="font-mono text-xs">{m.github_username}</span>
                   </label>
                 ))}
@@ -893,25 +978,25 @@ export default function Home() {
               <div className="text-xs text-gray-500 mt-1">{isDoxxed ? "Only you will be included in the group signature. To select other members, switch the toggle to anonymous." : "Only the selected members will be included in the group signature proof."}</div>
             </div>
             {requestMsg && (
-              <div className={`mb-2 text-sm font-semibold ${requestMsg.includes('Proof Generated') ? 'text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1' : requestMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{requestMsg}</div>
+              <div className={`mb-2 text-sm font-semibold ${requestMsg.includes('proof has been generated') ? 'text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1' : requestMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{
+                requestMsg.includes('proof has been generated')
+                  ? 'Your signature proof has been generated successfully. Your request has been submitted.'
+                  : requestMsg
+              }</div>
             )}
             {/* Progress bar for signature generation */}
             {requestLoading && <AnimatedEquation loading={requestLoading} />}
             {requestLoading && <ProgressBar />}
             {requestLoading && <ProofTimer loading={requestLoading} />}
             {/* Show SpeedReader if loading or proof generated */}
-            {(requestLoading || (requestMsg && requestMsg.includes('Proof Generated'))) && (
-              <SpeedReader script={PLONKY2_SCRIPT} loading={Boolean(requestLoading || (requestMsg && requestMsg.includes('Proof Generated')))} />
+            {(requestLoading || (requestMsg && requestMsg.includes('proof has been generated'))) && (
+              <SpeedReader script={PLONKY2_SCRIPT} loading={Boolean(requestLoading || (requestMsg && requestMsg.includes('proof has been generated')))} />
             )}
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" onClick={() => setAddRequestOpen(false)} disabled={requestLoading}>
-                {requestMsg && requestMsg.includes('Proof Generated') ? 'Close' : 'Cancel'}
+                {requestMsg && requestMsg.includes('proof has been generated') ? 'Close' : 'Cancel'}
               </Button>
-              {requestMsg && requestMsg.includes('Proof Generated') ? (
-                <Button variant="default" disabled className="bg-green-500 text-white cursor-not-allowed">
-                  Proof Generated ✅
-                </Button>
-              ) : (
+              {requestMsg && requestMsg.includes('proof has been generated') ? null : (
                 <Button variant="default" onClick={handleSubmitRequest} disabled={requestLoading}>
                   {requestLoading ? "Generating Proof..." : "Submit"}
                 </Button>
@@ -922,7 +1007,7 @@ export default function Home() {
       )}
       {verifyModalOpen && verifyRequest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
+          <div className="bg-white  shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
             <h2 className="text-xl font-bold mb-4">Verify Group Signature</h2>
             {/* Show request info */}
             <div className="mb-2">
@@ -940,7 +1025,7 @@ export default function Home() {
                       <img
                         src={`https://github.com/${username}.png`}
                         alt={username}
-                        className="w-6 h-6 rounded-full border border-gray-300"
+                        className="retro-avatar"
                       />
                       <span className="font-mono">{username}</span>
                       <a
@@ -978,29 +1063,30 @@ export default function Home() {
                           navigator.clipboard.writeText(verifyRequest.signature);
                         }
                       }}
-                      disabled={!verifyRequest.signature}
+                      disabled={!verifyRequest.signature || signatureLoading}
                     >
                       Copy
                     </button>
                   </div>
-                  <pre className="font-mono bg-gray-100 rounded px-2 py-1 block whitespace-pre-wrap break-words max-w-full">
-                    {(() => {
-                      if (typeof verifyRequest.signature !== 'string') return "N/A";
-                      const lines = verifyRequest.signature.split('\n').filter(Boolean);
-                      if (lines.length < 4) return lines.join('\n');
-                      const maxLen = 33;
-                      return [
-                        lines[0],
-                        lines[1].slice(0, maxLen),
-                        '...',
-                        lines[lines.length - 2].slice(-maxLen),
-                        lines[lines.length - 1]
-                      ].join('\n');
-                    })()}
+                  <pre className="font-mono bg-gray-100 rounded px-2 py-1 block whitespace-pre-wrap break-words max-w-full" style={{ minHeight: 40 }}>
+                    {signatureLoading
+                      ? <span className="text-gray-400">Loading signature...</span>
+                      : (typeof verifyRequest.signature !== 'string' ? "N/A" : (() => {
+                          const lines = verifyRequest.signature.split('\n').filter(Boolean);
+                          if (lines.length < 4) return lines.join('\n');
+                          const maxLen = 33;
+                          return [
+                            lines[0],
+                            lines[1].slice(0, maxLen),
+                            '...',
+                            lines[lines.length - 2].slice(-maxLen),
+                            lines[lines.length - 1]
+                          ].join('\n');
+                        })())}
                   </pre>
                 </div>
                 <div className="mb-4">
-                  <Button variant="default" onClick={handleVerifySignature} disabled={verifyLoading}>
+                  <Button variant="default" onClick={handleVerifySignature} disabled={signatureLoading || !verifyRequest.signature || verifyLoading}>
                     Verify Signature
                   </Button>
                 </div>
@@ -1027,7 +1113,7 @@ export default function Home() {
       )}
       {keyModalOpen && keyMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
+          <div className="bg-white  shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
             <h2 className="text-xl font-bold mb-4">Public Key for {keyMember.github_username}</h2>
             <div className="mb-2 font-mono text-xs break-all bg-gray-100 p-2 rounded border border-gray-200">
               {keyMember.public_key}

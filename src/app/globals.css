@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -118,5 +119,209 @@
   }
   body {
     @apply bg-background text-foreground;
+    background: #c0c0c0;
+    /* Uncomment if you add a starfield tile: */
+    /* background-image: url('/img/starfield-tile.gif'); */
+    font-family: 'Tahoma', 'Courier New', 'Chicago', monospace;
+    font-size: 14px;
   }
+  ::selection {
+    background: #000080;
+    color: #fff;
+  }
+  ::-webkit-scrollbar {
+    width: 16px;
+    background: #e0e0e0;
+    border-left: 2px solid #888;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #b0b0b0;
+    border: 2px outset #fff;
+  }
+}
+
+.retro-container {
+  width: 1280px;
+  min-height: 100vh;
+  margin: 32px auto;
+  background: #f0f0f0;
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 5px #aaa, 4px 4px 0px #888;
+  padding: 24px 0 32px 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+.retro-content-row {
+  display: flex;
+  flex-direction: row;
+  width: 1240px;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: center;
+}
+.retro-main-card {
+  max-width: 650px;
+  width: 90%;
+  margin: 0 auto 24px auto;
+  box-shadow: 2px 2px 0 #bbb;
+}
+.retro-sidebar {
+  width: 300px;
+  padding: 24px 24px 24px 24px;
+  margin-right: 32px;
+  background: #f8f8f8;
+  border-right: 2px solid #bbb;
+  border-radius: 6px 0 0 6px;
+}
+
+.retro-btn {
+  background-color: #e0e0e0;
+  border: 2px outset #999;
+  font-family: 'Tahoma', sans-serif;
+  padding: 5px 15px;
+  cursor: pointer;
+  box-shadow: inset -1px -1px 0px #fff, inset 1px 1px 0px #666;
+  border-radius: 0;
+  color: #222;
+  transition: background 0.1s, box-shadow 0.1s;
+}
+.retro-btn:hover {
+  background-color: #dcdcdc;
+}
+.retro-btn:active {
+  border: 2px inset #999;
+  background-color: #c8c8c8;
+  box-shadow: inset 1px 1px 0px #fff, inset -1px -1px 0px #666;
+}
+
+.retro-title {
+  font-family: 'Arial Black', 'Impact', sans-serif;
+  font-size: 26px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 0 #fff, 2px 2px 0 #888;
+}
+.retro-subtitle {
+  font-style: italic;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #333;
+}
+.blinking {
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink {
+  to { visibility: hidden; }
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Arial Black', 'Impact', sans-serif;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 0 #fff, 2px 2px 0 #888;
+}
+.retro-label {
+  font-family: 'Tahoma', 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: bold;
+  background: #e0e0e0;
+  border: 1px solid #888;
+  color: #222;
+  padding: 2px 8px;
+  border-radius: 2px;
+  box-shadow: 1px 1px 0 #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.retro-text {
+  font-family: 'Press Start 2P', 'Tahoma', 'Courier New', monospace;
+  font-size: 15px;
+  color: #222;
+  font-weight: bold;
+  text-shadow: 1px 1px 0 #fff;
+  letter-spacing: 0.5px;
+}
+
+.retro-avatar {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #000;
+  image-rendering: pixelated;
+  margin-right: 4px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.retro-card {
+  background: #f8f8f8;
+  border: 2px groove #999;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  font-family: 'Arial Black', 'Impact', sans-serif;
+  font-size: 16px;
+  box-shadow: 2px 2px 0 #fff, 4px 4px 0 #bbb;
+  border-radius: 4px;
+}
+
+.retro-modal {
+  background: #f0f0f0;
+  border: 2px solid #000;
+  box-shadow: 4px 4px 0 #888, 8px 8px 0 #bbb;
+  border-radius: 4px;
+  padding: 18px 22px 22px 22px;
+  font-family: 'Tahoma', 'Courier New', monospace;
+  position: relative;
+}
+.retro-modal-header {
+  background: #000080;
+  color: #fff;
+  font-family: 'Arial Black', 'Impact', sans-serif;
+  font-size: 18px;
+  padding: 6px 12px;
+  margin: -18px -22px 18px -22px;
+  border-bottom: 2px solid #fff;
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 0 #222;
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+.retro-add-btn {
+  padding: 0 24px;
+  height: 48px;
+  background: #000080;
+  color: #fff;
+  font-size: 1.2rem;
+  font-family: 'Arial Black', 'Impact', sans-serif;
+  border: 3px outset #fff;
+  box-shadow: 2px 2px 0 #888, 4px 4px 0 #bbb;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.1s, box-shadow 0.1s;
+  margin-left: 8px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 0 #222;
+}
+.retro-add-btn:hover {
+  background: #1a1aff;
+}
+.retro-add-btn:active {
+  border: 3px inset #fff;
+  background: #000060;
+  box-shadow: 1px 1px 0 #888;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
 }

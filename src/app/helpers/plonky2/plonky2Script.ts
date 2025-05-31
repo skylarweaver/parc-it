@@ -1,6 +1,6 @@
 // This file exports the PLONKY2_SCRIPT string used for the SpeedReader and educational UI in the app.
 
-const PLONKY2_SCRIPT = `Hey! So today I want to explain how Plonky2 helps prove something called an RSA-based group signature.
+const PLONKY2_SCRIPT = `Hey heyyy heyyyyyyyyy wussa wussaa wusssaaa wusssuuupp So today I want to explain how Plonky2 helps prove something called an RSA-based group signature.
 
 Don't worry, that might sound intense — but we're going to break it down like LEGOs.
 

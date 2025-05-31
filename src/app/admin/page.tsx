@@ -331,7 +331,7 @@ export default function AdminPage() {
             <ul className="space-y-2">
               {members.map((m) => (
                 <li key={m.id} className="flex items-center gap-2 border-b pb-1">
-                  <img src={m.avatar_url} alt={m.github_username} className="w-6 h-6 rounded-full" />
+                  <img src={m.avatar_url} alt={m.github_username} className="retro-avatar" />
                   <span className="flex-1">{m.github_username}</span>
                   <Button
                     variant="destructive"

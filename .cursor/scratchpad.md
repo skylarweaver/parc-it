@@ -638,3 +638,57 @@ The project needs to integrate cryptographic group signature functionality (Plon
 Skylar todos DO NO TOUCH:
 - add refresh of group members keys from github
 - add check on backend for proof verificaiton. unless we want people to submit requests which bad proofs
+
+## Performance Investigation & Optimization: Office Requests Feed
+
+### Background and Motivation
+After adding pagination, loading the office_requests feed became extremely slow (up to 27 seconds), even with only 31 records. Investigation revealed:
+- The frontend was sending duplicate requests for each page load/action.
+- The response payload was very large due to including the signature field (large JSON) for every record, even though it is only needed for verification.
+
+### Key Challenges and Analysis
+- **Duplicate Requests:** Multiple useEffect hooks or event handlers are triggering fetchRequests redundantly.
+- **Large Response Size:** The feed fetch includes the signature field, which is not needed for the main list display and greatly increases payload size.
+- **User Experience:** These issues combine to make the app feel slow and unresponsive, even though the database is fast.
+
+### High-level Task Breakdown
+
+1. **Audit and Refactor Fetch Logic**
+   - Review all useEffect hooks and event handlers that call fetchRequests.
+   - Ensure fetchRequests is only called once per intended user action (e.g., page load, page change, modal close).
+   - Remove or consolidate redundant calls.
+   - **Success Criteria:** Only one network request is sent per user action.
+
+2. **Reduce Response Payload Size**
+   - Update the Supabase select in fetchRequests to exclude the signature field for the main feed.
+   - Only fetch id, emoji, description, created_at, group_members, doxxed_member_id, and any other fields needed for the list view.
+   - Fetch the signature field only when opening the verify modal for a specific request.
+   - **Success Criteria:** The response size for the feed is reduced to a few KB, and the feed loads quickly.
+
+3. **Test and Validate**
+   - Test the feed with 31+ records and verify that loading is fast (<500ms typical).
+   - Confirm that the verify modal still works and fetches the signature as needed.
+   - Check that no duplicate requests are sent for any user action.
+   - **Success Criteria:** Feed is fast, no duplicate requests, and all features work as expected.
+
+4. **Document Lessons Learned**
+   - Add a note to the Lessons section about avoiding unnecessary large fields in list queries and watching for duplicate fetches in React apps.
+
+---
+
+### Project Status Board (Performance Optimization)
+
+- [x] Audit and refactor fetch logic to eliminate duplicate requests
+- [ ] Update select fields to reduce response size
+- [ ] Test and validate performance improvements
+- [ ] Document lessons learned
+
+---
+
+# Executor's Feedback or Assistance Requests (Performance Optimization)
+
+- Audited and refactored fetch logic in `page.tsx`:
+  - Removed the separate useEffect that triggered fetchRequests on pageSize change.
+  - Combined into a single useEffect that listens to currentPage, pageSize, and addRequestOpen, and only fetches when the modal is closed.
+  - This ensures only one network request is sent per user action (page load, page change, modal close).
+- Next step: Update the Supabase select fields in fetchRequests to reduce the response payload size by excluding the signature field from the main feed.

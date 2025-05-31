@@ -40,13 +40,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
-        <button className="absolute top-2 right-3 text-xl" onClick={onClose}>&times;</button>
-        <h2 className="text-lg font-bold mb-4">Login with Parc-It Key</h2>
+      <div className="retro-modal w-full max-w-md relative">
+        <div className="retro-modal-header">
+          <span>Login with Parc-It Key</span>
+          <button className="absolute top-2 right-3 text-xl" onClick={onClose} style={{ color: '#fff', background: 'none', border: 'none', fontWeight: 'bold', fontSize: 22, cursor: 'pointer', right: 12, top: 8 }}>&times;</button>
+        </div>
         <div className="mb-4 text-sm text-gray-700">
           <p className="mb-2">
             <strong>How to get your Parc-It Key:</strong><br />
-            You need to generate a special SSH signature using your SSH private key. From this signature, we can derive your SSH public key. Your SSH private key never leaves your machine. Your SSH public key is stored client-side only.
+            You need to generate a special SSH signature using your SSH private key. Your SSH private key never leaves your machine. Your SSH public key is stored client-side only.
           </p>
           <ol className="list-decimal list-inside mb-2">
             <li>Make sure you have an <strong>RSA SSH keypair</strong> (e.g. <code>~/.ssh/id_rsa</code>). If you don&apos;t, generate one with:<br />
