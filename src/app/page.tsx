@@ -8,10 +8,221 @@ import { generateSignature, verifySignature, getPlonky2Worker } from "../helpers
 import { Switch } from "../components/ui/switch";
 import EmojiPicker, { Theme, EmojiStyle } from 'emoji-picker-react';
 import ProgressBar from "../components/ui/ProgressBar";
+import PLONKY2_SCRIPT from "./helpers/plonky2/plonky2Script";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+function AnimatedEquation({ loading }: { loading: boolean }) {
+  const [equation, setEquation] = React.useState("");
+  const [elapsed, setElapsed] = React.useState(0);
+  const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  React.useEffect(() => {
+    if (!loading) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setElapsed(0);
+      return;
+    }
+    const p = (2n ** 64n) - (2n ** 32n) + 1n;
+    function randomBigInt(min: bigint, max: bigint) {
+      const range = max - min;
+      const rand = BigInt(Math.floor(Math.random() * Number(range)));
+      return min + rand;
+    }
+    function fmt(n: bigint) {
+      return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+    function generateEquation() {
+      const a = randomBigInt(10n ** 18n, 15n * 10n ** 18n);
+      const b = randomBigInt(8n * 10n ** 18n, 12n * 10n ** 18n);
+      const c = BigInt(Math.floor(Math.random() * 999) + 1);
+      const d = (a * b + c) % p;
+      return `${fmt(d)} = ${fmt(a)} × ${fmt(b)} + ${fmt(c)} (mod p)`;
+    }
+    setEquation(generateEquation());
+    setElapsed(0);
+    const interval = 50;
+    intervalRef.current = setInterval(() => {
+      setEquation(generateEquation());
+      setElapsed(e => e + interval / 1000);
+    }, interval);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [loading]);
+  if (!loading) return null;
+  return (
+    <>
+      <div className="w-full text-center text-xs font-mono text-gray-500 mb-1" style={{userSelect:'none'}}>
+        {equation}
+        <br />
+        where Goldilocks prime p = 18,446,744,069,414,584,321
+      </div>
+    </>
+  );
+}
+
+function ProofTimer({ loading }: { loading: boolean }) {
+  const [elapsed, setElapsed] = React.useState(0);
+  React.useEffect(() => {
+    if (!loading) {
+      setElapsed(0);
+      return;
+    }
+    let elapsedMs = 0;
+    const interval = setInterval(() => {
+      elapsedMs += 1000;
+      setElapsed(Math.floor(elapsedMs / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [loading]);
+  if (!loading) return null;
+  return (
+    <div className="w-full text-center text-xs font-mono text-gray-400 mt-1 mb-2" style={{userSelect:'none'}}>
+      {elapsed} / ~500 seconds
+    </div>
+  );
+}
+
+// SpeedReader component
+function SpeedReader({ script, loading }: { script: string, loading: boolean }) {
+  const [index, setIndex] = React.useState(0);
+  const [words, setWords] = React.useState<string[]>([]);
+  const [wpm, setWpm] = React.useState(100);
+  const [maxWpm, setMaxWpm] = React.useState(300);
+  const [paused, setPaused] = React.useState(false);
+  const [showControls, setShowControls] = React.useState(false);
+  const rampUpTime = 5; // seconds to reach target speed
+  const minWpm = 100;
+  const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Split script into words, keeping section breaks and line breaks as tokens
+  React.useEffect(() => {
+    const tokens = script
+      .replace(/\n/g, ' <br> ')
+      .replace(/⸻/g, ' <section> ')
+      .split(/\s+/)
+      .filter(Boolean);
+    setWords(tokens);
+    setIndex(0);
+    setWpm(minWpm);
+    setMaxWpm(300);
+    setPaused(false);
+    setShowControls(false);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    if (loading) {
+      controlsTimeoutRef.current = setTimeout(() => setShowControls(true), 10000);
+    }
+  }, [script, loading]);
+
+  // Animate word display
+  React.useEffect(() => {
+    if (!loading || words.length === 0 || paused) {
+      if (intervalRef.current) clearTimeout(intervalRef.current);
+      return;
+    }
+    if (index >= words.length) return;
+    // Calculate current wpm (ramp up)
+    let rampProgress = Math.min(index / (words.length * (rampUpTime * minWpm / 60)), 1);
+    // If maxWpm was increased, ramp up to new maxWpm immediately
+    let currentWpm = Math.round(minWpm + (maxWpm - minWpm) * rampProgress);
+    if (rampProgress >= 1 || maxWpm > 300) currentWpm = maxWpm;
+    setWpm(currentWpm);
+    // Determine delay
+    let delay = 60000 / currentWpm;
+    const word = words[index];
+    if (word === '<br>') delay = 400;
+    if (word === '<section>') delay = 900;
+    if (/[.!?…]$/.test(word)) delay += 200;
+    intervalRef.current = setTimeout(() => {
+      setIndex(i => i + 1);
+    }, delay);
+    return () => {
+      if (intervalRef.current) clearTimeout(intervalRef.current);
+    };
+  }, [index, words, loading, paused, maxWpm]);
+
+  React.useEffect(() => {
+    if (!loading) setIndex(0);
+  }, [loading]);
+
+  if (!loading || words.length === 0 || index >= words.length) return null;
+  const word = words[index];
+  const controls = showControls && (
+    <div className="flex items-center justify-between w-full max-w-xs mx-auto mb-2" style={{ minHeight: 40 }}>
+      {/* Pause/Play button on the left */}
+      <button
+        aria-label={paused ? 'Resume' : 'Pause'}
+        onClick={() => {
+          setPaused(p => !p);
+          // TODO: Remove this log
+          console.log(paused ? 'SpeedReader: Resume' : 'SpeedReader: Pause');
+        }}
+        className="text-gray-600 hover:text-gray-900 text-lg px-2 py-1 rounded-full bg-gray-200 hover:bg-gray-300 shadow transition-all focus:outline-none"
+        style={{ minWidth: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        {paused ? (
+          // Play icon (right-facing triangle)
+          <svg width="1.1em" height="1.1em" viewBox="0 0 20 20" fill="none"><polygon points="7,5 15,10 7,15" fill="currentColor"/></svg>
+        ) : (
+          // Pause icon (two vertical bars)
+          <svg width="1.1em" height="1.1em" viewBox="0 0 20 20" fill="none"><rect x="6" y="5" width="2.5" height="10" rx="1" fill="currentColor"/><rect x="11.5" y="5" width="2.5" height="10" rx="1" fill="currentColor"/></svg>
+        )}
+      </button>
+      {/* Word display in the center */}
+      <div className="flex-1 flex justify-center items-center">
+        {word === '<br>' ? (
+          <div style={{height:32}}></div>
+        ) : word === '<section>' ? (
+          <div style={{height:32}}><span className="text-2xl text-gray-300">⸻</span></div>
+        ) : (
+          <div className="w-full text-center text-2xl font-mono text-gray-700 select-none" style={{minHeight:40, lineHeight:'40px'}}>
+            {word}
+          </div>
+        )}
+      </div>
+      {/* Speed controls on the right, vertical layout */}
+      <div className="flex flex-col items-center justify-center ml-2" style={{height: 40}}>
+        <button
+          aria-label="Speed up"
+          onClick={() => {
+            setMaxWpm(w => {
+              const newWpm = w + 100;
+              return newWpm;
+            });
+          }}
+          className="text-blue-700 hover:text-white text-base px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-500 shadow transition-all focus:outline-none mb-1"
+          style={{ minWidth: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          {/* Upward arrow icon */}
+          <svg width="1em" height="1em" viewBox="0 0 20 20" fill="none"><path d="M10 16V4M10 4L6 8M10 4L14 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+        </button>
+        <button
+          aria-label="Speed down"
+          onClick={() => {
+            setMaxWpm(w => {
+              const newWpm = Math.max(100, w - 100);
+              return newWpm;
+            });
+          }}
+          className="text-blue-700 hover:text-white text-base px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-500 shadow transition-all focus:outline-none mt-1"
+          style={{ minWidth: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          {/* Downward arrow icon */}
+          <svg width="1em" height="1em" viewBox="0 0 20 20" fill="none"><path d="M10 4V16M10 16L6 12M10 16L14 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+  );
+  // Always render controls above the word display, even for breaks
+  return (
+    <div className="w-full flex flex-col items-center">
+      {controls}
+    </div>
+  );
+}
 
 export default function Home() {
   const [loginOpen, setLoginOpen] = React.useState(false);
@@ -44,6 +255,7 @@ export default function Home() {
   const emojiPickerRef = React.useRef<HTMLDivElement>(null);
   const [admins, setAdmins] = React.useState<any[]>([]);
   const [verifyLoading, setVerifyLoading] = React.useState(false);
+  const verifyResultCache = React.useRef<Record<string, {valid: boolean, groupKeys?: string, error?: any}>>({});
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -216,6 +428,14 @@ export default function Home() {
       setRequestMsg("Please select at least two group members.");
       return;
     }
+    // Enforce: user must be in selected group for anonymous requests
+    if (!isDoxxed) {
+      const userMember = members.find(m => m.public_key === userPubKey);
+      if (!userMember || !selectedGroup.includes(userMember.github_username)) {
+        setRequestMsg("You must include yourself in the selected group to submit an anonymous request. This is required because the anonymous group signature can only be generated if your key is part of the group—otherwise, the cryptographic proof will not work.");
+        return;
+      }
+    }
     setRequestLoading(true);
     try {
       // Determine group_members and doxxed_member_id
@@ -268,13 +488,18 @@ export default function Home() {
         }
         setRequestMsg(msg);
       } else {
-        setRequestMsg("Request submitted successfully!");
+        if (isDoxxed) {
+          setRequestMsg("Proof Generated ✅");
+        } else {
+          setRequestMsg("Your proof has been generated and is ready to use.");
+        }
         setRequestEmoji("");
         setRequestDesc("");
-        setTimeout(() => {
-          setAddRequestOpen(false);
-          setRequestMsg(null);
-        }, 1000);
+        // Do NOT close the modal automatically; let the user close it
+        // setTimeout(() => {
+        //   setAddRequestOpen(false);
+        //   setRequestMsg(null);
+        // }, 1000);
       }
     } catch (e) {
       let msg = "Unexpected error submitting request.";
@@ -325,6 +550,13 @@ export default function Home() {
   // Open verify modal for a request
   const handleOpenVerify = (req: any) => {
     setVerifyRequest(req);
+    // Use request.id if available, else fallback to signature as key
+    const cacheKey = req.id || req.signature || '';
+    if (verifyResultCache.current[cacheKey]) {
+      setVerifyResult(verifyResultCache.current[cacheKey]);
+    } else {
+      setVerifyResult(null);
+    }
     setVerifyModalOpen(true);
   };
   const handleCloseVerify = () => {
@@ -368,7 +600,6 @@ export default function Home() {
       setVerifyLoading(false);
       return;
     }
-    // Build message (emoji + description)
     const message = `${verifyRequest.emoji} ${verifyRequest.description}`;
     const signature = verifyRequest.signature;
     if (!signature || typeof signature !== 'string' || signature.length < 10) {
@@ -379,6 +610,9 @@ export default function Home() {
     try {
       const result = await verifySignature(message, signature);
       setVerifyResult(result);
+      // Store in cache
+      const cacheKey = verifyRequest.id || verifyRequest.signature || '';
+      verifyResultCache.current[cacheKey] = result;
     } catch (e) {
       setVerifyResult({ valid: false, error: e });
     }
@@ -522,7 +756,7 @@ export default function Home() {
                         <span className="text-3xl w-10 text-center">{req.emoji}</span>
                         <span className="flex-1 font-bold text-lg flex items-center gap-2">
                           {req.description}
-                          <span className={`px-2 py-1 rounded text-xs font-semibold ${isDoxxed ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-gray-200 text-gray-700 border border-gray-300'}`}>{isDoxxed ? 'Doxxed' : 'Anonymous'}</span>
+                          <span className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 ${isDoxxed ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-gray-200 text-gray-700 border border-gray-300'}`}>{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
                         </span>
                         <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
                       </div>
@@ -659,17 +893,29 @@ export default function Home() {
               <div className="text-xs text-gray-500 mt-1">{isDoxxed ? "Only you will be included in the group signature. To select other members, switch the toggle to anonymous." : "Only the selected members will be included in the group signature proof."}</div>
             </div>
             {requestMsg && (
-              <div className={`mb-2 text-sm font-semibold ${requestMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{requestMsg}</div>
+              <div className={`mb-2 text-sm font-semibold ${requestMsg.includes('Proof Generated') ? 'text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1' : requestMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{requestMsg}</div>
             )}
             {/* Progress bar for signature generation */}
+            {requestLoading && <AnimatedEquation loading={requestLoading} />}
             {requestLoading && <ProgressBar />}
+            {requestLoading && <ProofTimer loading={requestLoading} />}
+            {/* Show SpeedReader if loading or proof generated */}
+            {(requestLoading || (requestMsg && requestMsg.includes('Proof Generated'))) && (
+              <SpeedReader script={PLONKY2_SCRIPT} loading={Boolean(requestLoading || (requestMsg && requestMsg.includes('Proof Generated')))} />
+            )}
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" onClick={() => setAddRequestOpen(false)} disabled={requestLoading}>
-                Cancel
+                {requestMsg && requestMsg.includes('Proof Generated') ? 'Close' : 'Cancel'}
               </Button>
-              <Button variant="default" onClick={handleSubmitRequest} disabled={requestLoading}>
-                {requestLoading ? "Submitting..." : "Submit"}
-              </Button>
+              {requestMsg && requestMsg.includes('Proof Generated') ? (
+                <Button variant="default" disabled className="bg-green-500 text-white cursor-not-allowed">
+                  Proof Generated ✅
+                </Button>
+              ) : (
+                <Button variant="default" onClick={handleSubmitRequest} disabled={requestLoading}>
+                  {requestLoading ? "Generating Proof..." : "Submit"}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -715,8 +961,9 @@ export default function Home() {
             </div>
             {/* If doxxed, skip signature verification */}
             {verifyRequest.doxxed_member_id ? (
-              <div className="mb-4 text-blue-700 font-semibold bg-blue-50 border border-blue-200 rounded p-3 text-center">
-                No signature to verify for doxxed requests.
+              <div className="mb-4 text-blue-700 font-semibold bg-blue-50 border border-blue-200 rounded p-3 text-center flex flex-col items-center">
+                <span>No signature to verify for doxxed requests.</span>
+                <span className="mt-2 text-xs text-blue-900 flex items-center gap-1"><span>Doxxed</span><span title="The username of the submitter is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></span>
               </div>
             ) : (
               <>
@@ -757,12 +1004,15 @@ export default function Home() {
                     Verify Signature
                   </Button>
                 </div>
+                {verifyLoading && <AnimatedEquation loading={verifyLoading} />}
                 {verifyLoading && <ProgressBar />}
+                {verifyLoading && <ProofTimer loading={verifyLoading} />}
+                {verifyLoading && <SpeedReader script={PLONKY2_SCRIPT} loading={verifyLoading} />}
                 {verifyResult && (
-                  <div className="mb-4">
+                  <div className={`mb-4 ${verifyResult.valid ? 'text-green-700 bg-green-50 border border-green-200 rounded' : ''}`}>
                     <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
 {verifyResult.valid
-  ? `Signature is valid!\nGroup keys:\n${verifyResult.groupKeys}`
+  ? `Proof Generated ✅\nSignature is valid!\nGroup keys:\n${verifyResult.groupKeys}`
   : `Invalid signature: ${verifyResult.error?.message || String(verifyResult.error)}`}
                     </pre>
                   </div>
