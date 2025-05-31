@@ -234,13 +234,16 @@ export default function Home() {
         .filter((m) => groupMembers.includes(m.github_username))
         .map((m) => m.public_key)
         .join('\n');
-      // Generate signature
-      const signature = await generateSignature(message, groupKeys, parcItKey);
-      // Submit request with signature
+      // Generate signature only if anonymous
+      let signature = null;
+      if (!isDoxxed) {
+        signature = await generateSignature(message, groupKeys, parcItKey);
+      }
+      // Submit request with signature (or null)
       const { error } = await supabase.from("office_requests").insert({
         emoji: requestEmoji.trim(),
         description: requestDesc.trim(),
-        signature, // real signature
+        signature, // null for doxxed, real signature for anonymous
         group_id: "00000000-0000-0000-0000-000000000000", // TODO: real group logic
         public_signal: "dummy-signal", // TODO: real signal
         group_members: groupMembers,
@@ -692,51 +695,60 @@ export default function Home() {
                 )}
               </ul>
             </div>
-            {/* Raw signature with copy button */}
-            <div className="mb-4">
-              <div className="flex items-center mb-1">
-                <span className="font-bold">Raw Signature:</span>
-                <button
-                  className="ml-2 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                  onClick={() => {
-                    if (verifyRequest.signature) {
-                      navigator.clipboard.writeText(verifyRequest.signature);
-                    }
-                  }}
-                  disabled={!verifyRequest.signature}
-                >
-                  Copy
-                </button>
+            {/* If doxxed, skip signature verification */}
+            {verifyRequest.doxxed_member_id ? (
+              <div className="mb-4 text-blue-700 font-semibold bg-blue-50 border border-blue-200 rounded p-3 text-center">
+                No signature to verify for doxxed requests.
               </div>
-              <pre className="font-mono bg-gray-100 rounded px-2 py-1 block whitespace-pre-wrap break-words max-w-full">
-                {(() => {
-                  if (typeof verifyRequest.signature !== 'string') return "N/A";
-                  const lines = verifyRequest.signature.split('\n').filter(Boolean);
-                  if (lines.length < 4) return lines.join('\n');
-                  const maxLen = 33;
-                  return [
-                    lines[0],
-                    lines[1].slice(0, maxLen),
-                    '...',
-                    lines[lines.length - 2].slice(-maxLen),
-                    lines[lines.length - 1]
-                  ].join('\n');
-                })()}
-              </pre>
-            </div>
-            <div className="mb-4">
-              <Button variant="default" onClick={handleVerifySignature}>
-                Verify Signature
-              </Button>
-            </div>
-            {verifyResult && (
-              <div className="mb-4">
-                <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+            ) : (
+              <>
+                {/* Raw signature with copy button */}
+                <div className="mb-4">
+                  <div className="flex items-center mb-1">
+                    <span className="font-bold">Raw Signature:</span>
+                    <button
+                      className="ml-2 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                      onClick={() => {
+                        if (verifyRequest.signature) {
+                          navigator.clipboard.writeText(verifyRequest.signature);
+                        }
+                      }}
+                      disabled={!verifyRequest.signature}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre className="font-mono bg-gray-100 rounded px-2 py-1 block whitespace-pre-wrap break-words max-w-full">
+                    {(() => {
+                      if (typeof verifyRequest.signature !== 'string') return "N/A";
+                      const lines = verifyRequest.signature.split('\n').filter(Boolean);
+                      if (lines.length < 4) return lines.join('\n');
+                      const maxLen = 33;
+                      return [
+                        lines[0],
+                        lines[1].slice(0, maxLen),
+                        '...',
+                        lines[lines.length - 2].slice(-maxLen),
+                        lines[lines.length - 1]
+                      ].join('\n');
+                    })()}
+                  </pre>
+                </div>
+                <div className="mb-4">
+                  <Button variant="default" onClick={handleVerifySignature}>
+                    Verify Signature
+                  </Button>
+                </div>
+                {verifyResult && (
+                  <div className="mb-4">
+                    <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
 {verifyResult.valid
   ? `Signature is valid!\nGroup keys:\n${verifyResult.groupKeys}`
   : `Invalid signature: ${verifyResult.error?.message || String(verifyResult.error)}`}
-                </pre>
-              </div>
+                    </pre>
+                  </div>
+                )}
+              </>
             )}
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" onClick={handleCloseVerify}>Close</Button>
