@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { generateSignature, verifySignature } from "../helpers/plonky2/utils";
+import { generateSignature, verifySignature, getPlonky2Worker } from "../helpers/plonky2/utils";
 import { Switch } from "../components/ui/switch";
 import EmojiPicker, { Theme, EmojiStyle } from 'emoji-picker-react';
 import ProgressBar from "../components/ui/ProgressBar";
@@ -65,6 +65,10 @@ export default function Home() {
       setLoginOpen(false);
       localStorage.setItem("parcItKey", key);
       localStorage.setItem("parcItPubKey", pubKey);
+      // Start circuit initialization in the background
+      const worker = getPlonky2Worker();
+      const id = Date.now().toString() + Math.random().toString(16);
+      worker.postMessage({ id, op: 'initCircuit', args: {} });
     } catch (e) {
       setLoginStatus("Unexpected error during login. Please try again.");
       setLoggedIn(false);
@@ -383,6 +387,10 @@ export default function Home() {
       setUserPubKey(storedPubKey);
       setParcItKey(storedKey);
       setLoginStatus("Login successful! You are recognized as a group member.");
+      // Start circuit initialization in the background (for auto-login)
+      const worker = getPlonky2Worker();
+      const id = Date.now().toString() + Math.random().toString(16);
+      worker.postMessage({ id, op: 'initCircuit', args: {} });
     }
   }, []);
 

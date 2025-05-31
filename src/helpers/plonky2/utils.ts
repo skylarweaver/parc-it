@@ -1,20 +1,29 @@
 import { initPlonkyTwoCircuits, KeyCheckResponse } from './initPlonkyTwoCircuits';
 
+// Singleton Plonky2 worker instance
+let plonky2Worker: Worker | null = null;
+export function getPlonky2Worker() {
+  if (!plonky2Worker) {
+    plonky2Worker = new Worker(new URL('./plonky2.worker.ts', import.meta.url), { type: 'module' });
+  }
+  return plonky2Worker;
+}
+
 // Helper to send a message to the Plonky2 worker and await a response
 function plonky2WorkerCall<T = any>(op: string, args: any): Promise<T> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./plonky2.worker.ts', import.meta.url), { type: 'module' });
+    const worker = getPlonky2Worker();
     const id = Date.now().toString() + Math.random().toString(16);
-    worker.onmessage = (event) => {
+    const handleMessage = (event: MessageEvent) => {
       if (event.data.id === id) {
+        worker.removeEventListener('message', handleMessage);
         if ('result' in event.data) resolve(event.data.result);
         else reject(new Error(event.data.error));
-        worker.terminate();
       }
     };
+    worker.addEventListener('message', handleMessage);
     worker.onerror = (err) => {
       reject(err);
-      worker.terminate();
     };
     worker.postMessage({ id, op, args });
   });
@@ -52,4 +61,4 @@ export async function verifySignature(message: string, signature: string): Promi
   }
 }
 
-await wasmMod.default({ url: wasmUrl }); 
+// await wasmMod.default({ url: wasmUrl }); 
