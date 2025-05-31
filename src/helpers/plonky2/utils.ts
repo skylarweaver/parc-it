@@ -1,4 +1,19 @@
 import { initPlonkyTwoCircuits, KeyCheckResponse } from './initPlonkyTwoCircuits';
+import { createClient } from '@supabase/supabase-js';
+
+// Set up Supabase client (reuse your existing env vars)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Helper to report timing to Supabase
+async function reportPlonky2Timing(operation: string, durationMs: number) {
+  try {
+    await supabase.from('plonky2_timings').insert([{ operation, duration_ms: Math.round(durationMs) }]);
+  } catch (error) {
+    // Silently ignore errors
+  }
+}
 
 // Singleton Plonky2 worker instance
 let plonky2Worker: Worker | null = null;
@@ -14,11 +29,15 @@ function plonky2WorkerCall<T = any>(op: string, args: any): Promise<T> {
   return new Promise((resolve, reject) => {
     const worker = getPlonky2Worker();
     const id = Date.now().toString() + Math.random().toString(16);
+    // Listen for both result and timing messages
     const handleMessage = (event: MessageEvent) => {
       if (event.data.id === id) {
         worker.removeEventListener('message', handleMessage);
         if ('result' in event.data) resolve(event.data.result);
         else reject(new Error(event.data.error));
+      } else if (event.data.op === 'timing' && typeof event.data.durationMs === 'number') {
+        // Report timing to Supabase
+        reportPlonky2Timing(event.data.operation, event.data.durationMs);
       }
     };
     worker.addEventListener('message', handleMessage);
@@ -48,17 +67,10 @@ export async function generateSignature(message: string, publicKeys: string, dk:
 
 /**
  * Verifies a signature for a message and returns group keys if valid.
- * TODO: Offload to worker for consistency and performance.
+ * Offloaded to Plonky2 worker for consistency and performance.
  */
 export async function verifySignature(message: string, signature: string): Promise<{valid: boolean, groupKeys?: string, error?: any}> {
-  const { Circuit } = await initPlonkyTwoCircuits();
-  const circuit = new Circuit();
-  try {
-    const groupKeys = circuit.read_signature(message, signature);
-    return { valid: true, groupKeys };
-  } catch (error) {
-    return { valid: false, error };
-  }
+  return plonky2WorkerCall('verifySignature', { message, signature });
 }
 
 // await wasmMod.default({ url: wasmUrl }); 

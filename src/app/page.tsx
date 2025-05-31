@@ -43,6 +43,7 @@ export default function Home() {
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const emojiPickerRef = React.useRef<HTMLDivElement>(null);
   const [admins, setAdmins] = React.useState<any[]>([]);
+  const [verifyLoading, setVerifyLoading] = React.useState(false);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -362,12 +363,17 @@ export default function Home() {
   // Handler for verifying signature
   const handleVerifySignature = async () => {
     setVerifyResult(null);
-    if (!verifyRequest) return;
+    setVerifyLoading(true);
+    if (!verifyRequest) {
+      setVerifyLoading(false);
+      return;
+    }
     // Build message (emoji + description)
     const message = `${verifyRequest.emoji} ${verifyRequest.description}`;
     const signature = verifyRequest.signature;
     if (!signature || typeof signature !== 'string' || signature.length < 10) {
       setVerifyResult({ valid: false, error: { message: "No valid signature found for this request." } });
+      setVerifyLoading(false);
       return;
     }
     try {
@@ -376,6 +382,7 @@ export default function Home() {
     } catch (e) {
       setVerifyResult({ valid: false, error: e });
     }
+    setVerifyLoading(false);
   };
 
   useEffect(() => {
@@ -746,10 +753,11 @@ export default function Home() {
                   </pre>
                 </div>
                 <div className="mb-4">
-                  <Button variant="default" onClick={handleVerifySignature}>
+                  <Button variant="default" onClick={handleVerifySignature} disabled={verifyLoading}>
                     Verify Signature
                   </Button>
                 </div>
+                {verifyLoading && <ProgressBar />}
                 {verifyResult && (
                   <div className="mb-4">
                     <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">

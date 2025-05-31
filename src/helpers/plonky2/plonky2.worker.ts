@@ -53,7 +53,9 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
           circuitInstance = new Circuit();
           circuitReady = true;
           const t1 = performance.now();
-          console.log(`[Plonky2 Worker] Circuit initialization complete in ${(t1 - t0).toFixed(0)} ms`);
+          const duration = t1 - t0;
+          console.log(`[Plonky2 Worker] Circuit initialization complete in ${duration.toFixed(0)} ms`);
+          self.postMessage({ op: 'timing', operation: 'initCircuit', durationMs: Math.round(duration) });
           processQueue();
         }
         self.postMessage({ id, result: 'circuitReady' });
@@ -65,7 +67,9 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         const { message, publicKeys, dk } = args;
         result = circuitInstance.generate_signature(message, publicKeys, dk);
         const t1 = performance.now();
-        console.log(`[Plonky2 Worker] generateSignature complete for id=${id} in ${(t1 - t0).toFixed(0)} ms`);
+        const duration = t1 - t0;
+        console.log(`[Plonky2 Worker] generateSignature complete for id=${id} in ${duration.toFixed(0)} ms`);
+        self.postMessage({ op: 'timing', operation: 'generateSignature', durationMs: Math.round(duration) });
         self.postMessage({ id, result });
         break;
       }
@@ -75,17 +79,26 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         const { publicKeys, dk } = args;
         result = validate_keys(publicKeys, dk);
         const t1 = performance.now();
-        console.log(`[Plonky2 Worker] validateKeys complete for id=${id} in ${(t1 - t0).toFixed(0)} ms`);
+        const duration = t1 - t0;
+        console.log(`[Plonky2 Worker] validateKeys complete for id=${id} in ${duration.toFixed(0)} ms`);
+        self.postMessage({ op: 'timing', operation: 'validateKeys', durationMs: Math.round(duration) });
         self.postMessage({ id, result });
         break;
       }
       case 'verifySignature': {
         console.log(`[Plonky2 Worker] Calling verifySignature for id=${id}`);
         const t0 = performance.now();
-        // TODO: Implement actual verification logic here
-        // Example: result = circuitInstance.verify_signature(...);
+        const { message, signature } = args;
+        try {
+          const groupKeys = circuitInstance.read_signature(message, signature);
+          result = { valid: true, groupKeys };
+        } catch (error) {
+          result = { valid: false, error };
+        }
         const t1 = performance.now();
-        console.log(`[Plonky2 Worker] verifySignature complete for id=${id} in ${(t1 - t0).toFixed(0)} ms`);
+        const duration = t1 - t0;
+        console.log(`[Plonky2 Worker] verifySignature complete for id=${id} in ${duration.toFixed(0)} ms`);
+        self.postMessage({ op: 'timing', operation: 'verifySignature', durationMs: Math.round(duration) });
         self.postMessage({ id, result });
         break;
       }
