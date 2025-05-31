@@ -1,10 +1,28 @@
 import { initPlonkyTwoCircuits, KeyCheckResponse } from './initPlonkyTwoCircuits';
 
+// Helper to send a message to the Plonky2 worker and await a response
+function plonky2WorkerCall<T = any>(op: string, args: any): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./plonky2.worker.ts', import.meta.url), { type: 'module' });
+    const id = Date.now().toString() + Math.random().toString(16);
+    worker.onmessage = (event) => {
+      if (event.data.id === id) {
+        if ('result' in event.data) resolve(event.data.result);
+        else reject(new Error(event.data.error));
+        worker.terminate();
+      }
+    };
+    worker.onerror = (err) => {
+      reject(err);
+      worker.terminate();
+    };
+    worker.postMessage({ id, op, args });
+  });
+}
+
 /**
  * Checks DK (parcit key) against the group of public keys and returns detailed result.
- * @param publicKeys - Newline-separated public keys
- * @param dk - The user's parcit key
- * @returns Promise<KeyCheckResponse> - detailed result including user_public_key_index
+ * This is NOT offloaded to the worker (restored to main-branch style).
  */
 export async function getDKGroupCheck(publicKeys: string, dk: string): Promise<KeyCheckResponse> {
   const { validate_keys } = await initPlonkyTwoCircuits();
@@ -13,22 +31,15 @@ export async function getDKGroupCheck(publicKeys: string, dk: string): Promise<K
 
 /**
  * Generates a signature for a message using the group circuit.
- * @param message - The message to sign
- * @param publicKeys - Newline-separated public keys
- * @param dk - The user's parcit key
- * @returns Promise<string> - The generated signature
+ * Offloaded to Plonky2 worker.
  */
 export async function generateSignature(message: string, publicKeys: string, dk: string): Promise<string> {
-  const { Circuit } = await initPlonkyTwoCircuits();
-  const circuit = new Circuit();
-  return circuit.generate_signature(message, publicKeys, dk);
+  return plonky2WorkerCall('generateSignature', { message, publicKeys, dk });
 }
 
 /**
  * Verifies a signature for a message and returns group keys if valid.
- * @param message - The message to verify
- * @param signature - The signature to verify
- * @returns Promise<{valid: boolean, groupKeys?: string, error?: any}>
+ * TODO: Offload to worker for consistency and performance.
  */
 export async function verifySignature(message: string, signature: string): Promise<{valid: boolean, groupKeys?: string, error?: any}> {
   const { Circuit } = await initPlonkyTwoCircuits();
@@ -39,4 +50,6 @@ export async function verifySignature(message: string, signature: string): Promi
   } catch (error) {
     return { valid: false, error };
   }
-} 
+}
+
+await wasmMod.default({ url: wasmUrl }); 

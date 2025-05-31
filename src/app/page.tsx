@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { generateSignature, verifySignature } from "../helpers/plonky2/utils";
 import { Switch } from "../components/ui/switch";
 import EmojiPicker, { Theme, EmojiStyle } from 'emoji-picker-react';
+import ProgressBar from "../components/ui/ProgressBar";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -645,6 +646,8 @@ export default function Home() {
             {requestMsg && (
               <div className={`mb-2 text-sm font-semibold ${requestMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{requestMsg}</div>
             )}
+            {/* Progress bar for signature generation */}
+            {requestLoading && <ProgressBar />}
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" onClick={() => setAddRequestOpen(false)} disabled={requestLoading}>
                 Cancel
