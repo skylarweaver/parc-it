@@ -14,7 +14,9 @@ export async function initPlonkyTwoCircuits(): Promise<{
   if (!wasmModule) {
     // Dynamic import for browser-only loading
     const mod = await import('./double_blind_web.js');
-    await mod.default(); // Initializes WASM
+    // Always load WASM from the public/wasm path
+    const wasmUrl = '/wasm/double_blind_web_bg.wasm';
+    await mod.default(wasmUrl); // Initializes WASM from public path
     wasmModule = {
       Circuit: mod.Circuit,
       validate_keys: mod.validate_keys,

@@ -110,6 +110,26 @@ function takeFromExternrefTable0(idx) {
     wasm.__externref_table_dealloc(idx);
     return value;
 }
+
+let cachedDataViewMemory0 = null;
+
+function getDataViewMemory0() {
+    if (cachedDataViewMemory0 === null || cachedDataViewMemory0.buffer.detached === true || (cachedDataViewMemory0.buffer.detached === undefined && cachedDataViewMemory0.buffer !== wasm.memory.buffer)) {
+        cachedDataViewMemory0 = new DataView(wasm.memory.buffer);
+    }
+    return cachedDataViewMemory0;
+}
+
+function getArrayJsValueFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    const mem = getDataViewMemory0();
+    const result = [];
+    for (let i = ptr; i < ptr + 4 * len; i += 4) {
+        result.push(wasm.__wbindgen_export_2.get(mem.getUint32(i, true)));
+    }
+    wasm.__externref_drop_slice(ptr, len);
+    return result;
+}
 /**
  * @param {string} public_keys
  * @param {string} double_blind_key
@@ -205,6 +225,20 @@ export class Circuit {
             wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
         }
     }
+    /**
+     * @returns {Prover}
+     */
+    prover() {
+        const ret = wasm.circuit_prover(this.__wbg_ptr);
+        return Prover.__wrap(ret);
+    }
+    /**
+     * @returns {Verifier}
+     */
+    verifier() {
+        const ret = wasm.circuit_verifier(this.__wbg_ptr);
+        return Verifier.__wrap(ret);
+    }
 }
 
 const KeyCheckResponseFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -277,34 +311,199 @@ export class KeyCheckResponse {
     }
 }
 
-const TestFinalization = (typeof FinalizationRegistry === 'undefined')
+const ProverFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_test_free(ptr >>> 0, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_prover_free(ptr >>> 0, 1));
 
-export class Test {
+export class Prover {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(Prover.prototype);
+        obj.__wbg_ptr = ptr;
+        ProverFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
 
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
-        TestFinalization.unregister(this);
+        ProverFinalization.unregister(this);
         return ptr;
     }
 
     free() {
         const ptr = this.__destroy_into_raw();
-        wasm.__wbg_test_free(ptr, 0);
+        wasm.__wbg_prover_free(ptr, 0);
+    }
+    /**
+     * Generate a signature without a nullifier.
+     * @param {string} message
+     * @param {string} public_keys
+     * @param {string} double_blind_key
+     * @returns {Signature}
+     */
+    generate_signature(message, public_keys, double_blind_key) {
+        const ptr0 = passStringToWasm0(message, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(public_keys, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passStringToWasm0(double_blind_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ret = wasm.prover_generate_signature(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return Signature.__wrap(ret[0]);
+    }
+    /**
+     * Generate a signature with a nullifier.
+     * The nonce should be 32 bytes long.
+     * @param {string} message
+     * @param {string} public_keys
+     * @param {string} double_blind_key
+     * @param {Uint8Array} nonce
+     * @returns {Signature}
+     */
+    generate_signature_with_nullifier(message, public_keys, double_blind_key, nonce) {
+        const ptr0 = passStringToWasm0(message, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(public_keys, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passStringToWasm0(double_blind_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArray8ToWasm0(nonce, wasm.__wbindgen_malloc);
+        const len3 = WASM_VECTOR_LEN;
+        const ret = wasm.prover_generate_signature_with_nullifier(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return Signature.__wrap(ret[0]);
+    }
+}
+
+const SignatureFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_signature_free(ptr >>> 0, 1));
+
+export class Signature {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(Signature.prototype);
+        obj.__wbg_ptr = ptr;
+        SignatureFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        SignatureFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_signature_free(ptr, 0);
+    }
+    /**
+     * @returns {string}
+     */
+    signature() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.signature_signature(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * @returns {string[]}
+     */
+    public_keys() {
+        const ret = wasm.signature_public_keys(this.__wbg_ptr);
+        var v1 = getArrayJsValueFromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
+     * @returns {boolean}
+     */
+    has_nullifier() {
+        const ret = wasm.signature_has_nullifier(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * @returns {Uint8Array}
+     */
+    nullifier() {
+        const ret = wasm.signature_nullifier(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
+     * @returns {Uint8Array}
+     */
+    nonce() {
+        const ret = wasm.signature_nonce(this.__wbg_ptr);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+}
+
+const VerifierFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_verifier_free(ptr >>> 0, 1));
+
+export class Verifier {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(Verifier.prototype);
+        obj.__wbg_ptr = ptr;
+        VerifierFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        VerifierFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_verifier_free(ptr, 0);
     }
     constructor() {
-        const ret = wasm.test_new();
+        const ret = wasm.verifier_new();
         this.__wbg_ptr = ret >>> 0;
-        TestFinalization.register(this, this.__wbg_ptr, this);
+        VerifierFinalization.register(this, this.__wbg_ptr, this);
         return this;
     }
     /**
-     * @param {number} arg0
+     * @param {string} message
+     * @param {string} signature
+     * @returns {Signature}
      */
-    test(arg0) {
-        wasm.test_test(this.__wbg_ptr, arg0);
+    read_signature(message, signature) {
+        const ptr0 = passStringToWasm0(message, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(signature, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.verifier_read_signature(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return Signature.__wrap(ret[0]);
     }
 }
 
@@ -480,6 +679,7 @@ function __wbg_init_memory(imports, memory) {
 function __wbg_finalize_init(instance, module) {
     wasm = instance.exports;
     __wbg_init.__wbindgen_wasm_module = module;
+    cachedDataViewMemory0 = null;
     cachedUint8ArrayMemory0 = null;
 
 
@@ -525,7 +725,7 @@ async function __wbg_init(module_or_path) {
     }
 
     if (typeof module_or_path === 'undefined') {
-        module_or_path = new URL('double_blind_web_bg.wasm', import.meta.url);
+        throw new Error('WASM path must be provided explicitly. See integration notes.');
     }
     const imports = __wbg_get_imports();
 

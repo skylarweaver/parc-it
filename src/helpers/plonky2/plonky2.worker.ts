@@ -12,17 +12,21 @@ let circuitInstance: any = null;
 let circuitReady: boolean = false;
 let requestQueue: any[] = [];
 
-async function ensureWasmLoaded() {
+async function ensureWasmLoaded(caller = 'unknown') {
+  console.log(`[Plonky2 Worker] ensureWasmLoaded called by: ${caller}`);
   if (!wasmMod) {
+    console.log('[Plonky2 Worker] WASM module not loaded, starting dynamic import...');
     // Dynamic import for WASM module
     wasmMod = await import('./double_blind_web.js');
     // Log the URL being used
     const wasmUrl = self.location.origin + '/wasm/double_blind_web_bg.wasm';
     console.log('[Plonky2 Worker] Loading WASM from:', wasmUrl);
     await wasmMod.default(wasmUrl);
-    console.log('[Plonky2 Worker] WASM loaded');
+    console.log('[Plonky2 Worker] WASM loaded and initialized');
     Circuit = wasmMod.Circuit;
     validate_keys = wasmMod.validate_keys;
+  } else {
+    console.log('[Plonky2 Worker] WASM module already loaded');
   }
 }
 
@@ -36,10 +40,18 @@ function processQueue() {
 }
 
 async function handleRequest(event: MessageEvent, id: string, op: string, args: any) {
+  console.log(`[Plonky2 Worker] handleRequest called: op=${op}, id=${id}`);
   try {
-    await ensureWasmLoaded();
+    // Pass caller info for logging
+    if (op === 'initCircuit' || op === 'generateSignature' || op === 'validateKeys') {
+      await ensureWasmLoaded('circuit-related');
+    } else if (op === 'verifySignature') {
+      await ensureWasmLoaded('verifySignature');
+    } else {
+      await ensureWasmLoaded('other');
+    }
     // Wait for circuit to be ready if needed
-    if (!circuitReady && op !== 'initCircuit') {
+    if (!circuitReady && op !== 'initCircuit' && (op === 'generateSignature' || op === 'validateKeys')) {
       console.log(`[Plonky2 Worker] Circuit not ready, queuing request: op=${op}, id=${id}`);
       requestQueue.push({ event, id, op, args });
       return;
@@ -47,6 +59,7 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
     let result;
     switch (op) {
       case 'initCircuit': {
+        console.log('[Plonky2 Worker] switch: initCircuit');
         if (!circuitInstance) {
           console.log('[Plonky2 Worker] Circuit initialization started');
           const t0 = performance.now();
@@ -62,6 +75,12 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         break;
       }
       case 'generateSignature': {
+        console.log('[Plonky2 Worker] switch: generateSignature');
+        if (!circuitReady) {
+          // Wait for circuit to be ready
+          requestQueue.push({ event, id, op, args });
+          return;
+        }
         console.log(`[Plonky2 Worker] Calling generateSignature for id=${id}`);
         const t0 = performance.now();
         const { message, publicKeys, dk } = args;
@@ -74,6 +93,12 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         break;
       }
       case 'validateKeys': {
+        console.log('[Plonky2 Worker] switch: validateKeys');
+        if (!circuitReady) {
+          // Wait for circuit to be ready
+          requestQueue.push({ event, id, op, args });
+          return;
+        }
         console.log(`[Plonky2 Worker] Calling validateKeys for id=${id}`);
         const t0 = performance.now();
         const { publicKeys, dk } = args;
@@ -86,13 +111,29 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         break;
       }
       case 'verifySignature': {
+        console.log('[Plonky2 Worker] switch: verifySignature');
+        // Verification does NOT require the circuit, only the Verifier class
         console.log(`[Plonky2 Worker] Calling verifySignature for id=${id}`);
         const t0 = performance.now();
         const { message, signature } = args;
         try {
-          const groupKeys = circuitInstance.read_signature(message, signature);
-          result = { valid: true, groupKeys };
+          const { Verifier } = wasmMod;
+          const verifier = new Verifier();
+          console.log(`[Plonky2 Worker] About to call verifier.read_signature for id=${id}`);
+          const sigObj = verifier.read_signature(message, signature);
+          console.log(`[Plonky2 Worker] verifier.read_signature returned for id=${id}`);
+          // Extract groupKeys and nullifier if present
+          let groupKeys = undefined;
+          let nullifier = undefined;
+          if (typeof sigObj.public_keys === 'function') {
+            groupKeys = sigObj.public_keys().join('\n');
+          }
+          if (typeof sigObj.has_nullifier === 'function' && sigObj.has_nullifier()) {
+            nullifier = sigObj.nullifier();
+          }
+          result = { valid: true, groupKeys, nullifier };
         } catch (error) {
+          console.error(`[Plonky2 Worker] Error in verifier.read_signature for id=${id}:`, error);
           result = { valid: false, error };
         }
         const t1 = performance.now();
@@ -103,6 +144,7 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         break;
       }
       default:
+        console.log(`[Plonky2 Worker] switch: unknown op ${op}`);
         throw new Error(`Unknown operation: ${op}`);
     }
   } catch (error: any) {

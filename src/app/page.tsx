@@ -220,6 +220,32 @@ function SpeedReader({ script, loading }: { script: string, loading: boolean }) 
   );
 }
 
+// Utility: Check if an ssh-rsa key is 4096 bits
+function is4096RsaKey(sshKey: string): boolean {
+  if (!sshKey.startsWith('ssh-rsa ')) return false;
+  const b64 = sshKey.split(' ')[1];
+  const bytes = typeof Buffer !== 'undefined' ? Buffer.from(b64, 'base64') : Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  let offset = 0;
+  function readUint32() {
+    return (bytes[offset++] << 24) | (bytes[offset++] << 16) | (bytes[offset++] << 8) | (bytes[offset++]);
+  }
+  function readBuffer() {
+    const len = readUint32();
+    const buf = bytes.slice(offset, offset + len);
+    offset += len;
+    return buf;
+  }
+  readBuffer(); // type ('ssh-rsa')
+  readBuffer(); // e
+  let n = readBuffer(); // modulus
+  if (n[0] === 0x00) n = n.slice(1);
+  const firstByte = n[0];
+  let bits = (n.length - 1) * 8;
+  let b = firstByte;
+  while (b) { bits++; b >>= 1; }
+  return bits === 4096;
+}
+
 export default function Home() {
   const [loginOpen, setLoginOpen] = React.useState(false);
   const [loginStatus, setLoginStatus] = React.useState<string | null>(null);
@@ -245,7 +271,7 @@ export default function Home() {
   const [keyMember, setKeyMember] = React.useState<any>(null);
   const [selectedGroup, setSelectedGroup] = React.useState<string[]>([]);
   const [parcItKey, setParcItKey] = React.useState<string | null>(null);
-  const [verifyResult, setVerifyResult] = React.useState<{valid: boolean, groupKeys?: string, error?: any} | null>(null);
+  const [verifyResult, setVerifyResult] = React.useState<{valid: boolean, groupKeys?: string, nullifier?: Uint8Array | string, error?: any} | null>(null);
   const [isDoxxed, setIsDoxxed] = React.useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const emojiPickerRef = React.useRef<HTMLDivElement>(null);
@@ -265,6 +291,14 @@ export default function Home() {
       // Only local validation: check if we can derive a valid SSH key from the Parc-It Key
       if (!pubKey || pubKey.startsWith("ERROR")) {
         setLoginStatus("Could not extract a valid SSH public key from the signature.");
+        setLoggedIn(false);
+        setUserPubKey(null);
+        setParcItKey(null);
+        setLoading(false);
+        return;
+      }
+      if (!is4096RsaKey(pubKey)) {
+        setLoginStatus("Login failed: Your key is not a 4096-bit RSA key. Please generate a new 4096-bit RSA key and try again.");
         setLoggedIn(false);
         setUserPubKey(null);
         setParcItKey(null);
@@ -334,54 +368,6 @@ export default function Home() {
     fetchMembers();
     fetchAdmins();
   }, []);
-
-  // Add member handler
-  const handleAddMember = async () => {
-    setAdminMsg(null);
-    if (!addUsername.trim()) {
-      setAdminMsg("Please enter a GitHub username.");
-      return;
-    }
-    setMemberLoading(true);
-    try {
-      const username = addUsername.trim();
-      const avatar_url = `https://github.com/${username}.png`;
-      // Use the new API route to fetch keys
-      const keysResp = await fetch(`/api/github-keys?username=${encodeURIComponent(username)}`);
-      const keysData = await keysResp.json();
-      if (!keysResp.ok) {
-        setAdminMsg(keysData.error || "Failed to fetch keys for this user.");
-        setMemberLoading(false);
-        return;
-      }
-      // Find the first ssh-rsa key
-      const public_key = (keysData.keys || []).find((k: string) => k.startsWith("ssh-rsa ")) || "";
-      if (!public_key) {
-        setAdminMsg("No ssh-rsa public key found for this GitHub user.");
-        setMemberLoading(false);
-        return;
-      }
-      const { error } = await supabase.from("group_members").insert({
-        github_username: username,
-        avatar_url,
-        public_key,
-      });
-      if (error) {
-        setAdminMsg("Failed to add member: " + error.message);
-        console.error(error);
-      } else {
-        setAdminMsg("Member added successfully.");
-        setAddUsername("");
-        // Refresh member list
-        const { data } = await supabase.from("group_members").select("id, github_username, avatar_url, public_key");
-        setMembers(data || []);
-      }
-    } catch (e) {
-      setAdminMsg("Unexpected error adding member.");
-      console.error(e);
-    }
-    setMemberLoading(false);
-  };
 
   // Remove member handler
   const handleRemoveMember = async (id: string) => {
@@ -647,6 +633,7 @@ export default function Home() {
 
   // Handler for verifying signature
   const handleVerifySignature = async () => {
+    console.log('[UI] User clicked Verify Signature');
     setVerifyResult(null);
     setVerifyLoading(true);
     if (!verifyRequest) {
@@ -661,13 +648,16 @@ export default function Home() {
       return;
     }
     try {
+      console.log('[UI] Starting verification with message:', message, 'signature:', signature.slice(0, 32) + '...');
       const result = await verifySignature(message, signature);
       setVerifyResult(result);
       // Store in cache
       const cacheKey = verifyRequest.id || verifyRequest.signature || '';
       verifyResultCache.current[cacheKey] = result;
+      console.log('[UI] Verification finished. Result:', result);
     } catch (e) {
       setVerifyResult({ valid: false, error: e });
+      console.error('[UI] Verification error:', e);
     }
     setVerifyLoading(false);
   };
@@ -953,7 +943,13 @@ export default function Home() {
             <div className="mb-4">
               <label className="block mb-1 font-semibold">Select Group Members</label>
               <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
-                {members.map((m) => (
+                {[...(members || [])]
+                  .sort((a, b) => {
+                    if (a.public_key === userPubKey) return -1;
+                    if (b.public_key === userPubKey) return 1;
+                    return a.github_username.localeCompare(b.github_username);
+                  })
+                  .map((m) => (
                   <label key={m.id} className="flex items-center gap-2 py-1 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1101,6 +1097,15 @@ export default function Home() {
   ? `Proof Generated ✅\nSignature is valid!\nGroup keys:\n${verifyResult.groupKeys}`
   : `Invalid signature: ${verifyResult.error?.message || String(verifyResult.error)}`}
                     </pre>
+                    {/* Nullifier display: only for upvotes (not regular group signatures) */}
+                    {verifyResult.valid && 'nullifier' in verifyResult && verifyResult.nullifier && (
+                      <div className="mt-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded p-2">
+                        <span className="font-bold">Nullifier:</span> {Array.isArray(verifyResult.nullifier) ?
+                          Buffer.from(verifyResult.nullifier).toString('hex') : String(verifyResult.nullifier)}
+                        <br />
+                        <span className="text-gray-500">(Nullifiers are only present for upvotes or actions requiring uniqueness. Regular group signatures do not include a nullifier.)</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

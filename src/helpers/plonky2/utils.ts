@@ -15,7 +15,7 @@ async function reportPlonky2Timing(operation: string, durationMs: number) {
   }
 }
 
-// Singleton Plonky2 worker instance
+// Singleton Plonky2 circuit worker instance
 let plonky2Worker: Worker | null = null;
 export function getPlonky2Worker() {
   if (!plonky2Worker) {
@@ -24,12 +24,22 @@ export function getPlonky2Worker() {
   return plonky2Worker;
 }
 
-// Helper to send a message to the Plonky2 worker and await a response
+// Singleton Plonky2 verifier worker instance
+let verifierWorker: Worker | null = null;
+export function getVerifierWorker() {
+  if (!verifierWorker) {
+    verifierWorker = new Worker(new URL('./plonky2.verify.worker.ts', import.meta.url), { type: 'module' });
+  }
+  return verifierWorker;
+}
+
+// Helper to send a message to the correct worker and await a response
 function plonky2WorkerCall<T = any>(op: string, args: any): Promise<T> {
+  // Route verifySignature to the verifier worker, all others to the circuit worker
+  const worker = op === 'verifySignature' ? getVerifierWorker() : getPlonky2Worker();
+  const id = Date.now().toString() + Math.random().toString(16);
+  // Listen for both result and timing messages
   return new Promise((resolve, reject) => {
-    const worker = getPlonky2Worker();
-    const id = Date.now().toString() + Math.random().toString(16);
-    // Listen for both result and timing messages
     const handleMessage = (event: MessageEvent) => {
       if (event.data.id === id) {
         worker.removeEventListener('message', handleMessage);
