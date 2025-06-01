@@ -1,250 +1,22 @@
 "use client";
-import Image from "next/image";
 import { Button } from "../components/ui/button";
 import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateSignature, verifySignature, getPlonky2Worker } from "../helpers/plonky2/utils";
-import { Switch } from "../components/ui/switch";
 import EmojiPicker, { Theme, EmojiStyle } from 'emoji-picker-react';
 import ProgressBar from "../components/ui/ProgressBar";
 import PLONKY2_SCRIPT from "./helpers/plonky2/plonky2Script";
 import RetroHeader from "../components/RetroHeader";
+import { OfficeRequest, GroupMember, Admin } from "../types/models";
+import { is4096RsaKey } from "../helpers/utils";
+import AnimatedEquation from "../components/AnimatedEquation";
+import ProofTimer from "../components/ProofTimer";
+import SpeedReader from "../components/SpeedReader";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-function AnimatedEquation({ loading }: { loading: boolean }) {
-  const [equation, setEquation] = React.useState("");
-  const [elapsed, setElapsed] = React.useState(0);
-  const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
-  React.useEffect(() => {
-    if (!loading) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setElapsed(0);
-      return;
-    }
-    const p = (2n ** 64n) - (2n ** 32n) + 1n;
-    function randomBigInt(min: bigint, max: bigint) {
-      const range = max - min;
-      const rand = BigInt(Math.floor(Math.random() * Number(range)));
-      return min + rand;
-    }
-    function fmt(n: bigint) {
-      return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    }
-    function generateEquation() {
-      const a = randomBigInt(10n ** 18n, 15n * 10n ** 18n);
-      const b = randomBigInt(8n * 10n ** 18n, 12n * 10n ** 18n);
-      const c = BigInt(Math.floor(Math.random() * 999) + 1);
-      const d = (a * b + c) % p;
-      return `${fmt(d)} = ${fmt(a)} × ${fmt(b)} + ${fmt(c)} (mod p)`;
-    }
-    setEquation(generateEquation());
-    setElapsed(0);
-    const interval = 50;
-    intervalRef.current = setInterval(() => {
-      setEquation(generateEquation());
-      setElapsed(e => e + interval / 1000);
-    }, interval);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [loading]);
-  if (!loading) return null;
-  return (
-    <>
-      <div className="w-full text-center text-xs font-mono text-gray-500 mb-1" style={{userSelect:'none'}}>
-        {equation}
-        <br />
-        where Goldilocks prime p = 18,446,744,069,414,584,321
-      </div>
-    </>
-  );
-}
-
-function ProofTimer({ loading }: { loading: boolean }) {
-  const [elapsed, setElapsed] = React.useState(0);
-  React.useEffect(() => {
-    if (!loading) {
-      setElapsed(0);
-      return;
-    }
-    let elapsedMs = 0;
-    const interval = setInterval(() => {
-      elapsedMs += 1000;
-      setElapsed(Math.floor(elapsedMs / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [loading]);
-  if (!loading) return null;
-  return (
-    <div className="w-full text-center text-xs font-mono text-gray-400 mt-1 mb-2" style={{userSelect:'none'}}>
-      {elapsed} / ~500 seconds
-    </div>
-  );
-}
-
-// SpeedReader component
-function SpeedReader({ script, loading }: { script: string, loading: boolean }) {
-  const [index, setIndex] = React.useState(0);
-  const [words, setWords] = React.useState<string[]>([]);
-  const [wpm, setWpm] = React.useState(100);
-  const [maxWpm, setMaxWpm] = React.useState(300);
-  const [paused, setPaused] = React.useState(false);
-  const [showControls, setShowControls] = React.useState(true);
-  const rampUpTime = 10; // seconds to reach target speed
-  const minWpm = 100;
-  const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
-  const controlsTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  // Split script into words, keeping section breaks and line breaks as tokens
-  React.useEffect(() => {
-    const tokens = script
-      .replace(/\n/g, ' <br> ')
-      .replace(/⸻/g, ' <section> ')
-      .split(/\s+/)
-      .filter(Boolean);
-    setWords(tokens);
-    setIndex(0);
-    setWpm(minWpm);
-    setMaxWpm(300);
-    setPaused(false);
-    setShowControls(true); // Controls are now always shown immediately
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-  }, [script, loading]);
-
-  // Animate word display
-  React.useEffect(() => {
-    if (!loading || words.length === 0 || paused) {
-      if (intervalRef.current) clearTimeout(intervalRef.current);
-      return;
-    }
-    if (index >= words.length) return;
-    // Calculate current wpm (ramp up)
-    let rampProgress = Math.min(index / (words.length * (rampUpTime * minWpm / 60)), 1);
-    // If maxWpm was increased, ramp up to new maxWpm immediately
-    let currentWpm = Math.round(minWpm + (maxWpm - minWpm) * rampProgress);
-    if (rampProgress >= 1 || maxWpm > 300) currentWpm = maxWpm;
-    setWpm(currentWpm);
-    // Determine delay
-    let delay = 60000 / currentWpm;
-    const word = words[index];
-    if (word === '<br>') delay = 400;
-    if (word === '<section>') delay = 900;
-    if (/[.!?…]$/.test(word)) delay += 200;
-    intervalRef.current = setTimeout(() => {
-      setIndex(i => i + 1);
-    }, delay);
-    return () => {
-      if (intervalRef.current) clearTimeout(intervalRef.current);
-    };
-  }, [index, words, loading, paused, maxWpm]);
-
-  React.useEffect(() => {
-    if (!loading) setIndex(0);
-  }, [loading]);
-
-  if (!loading || words.length === 0 || index >= words.length) return null;
-  const word = words[index];
-  const controls = showControls && (
-    <div className="flex items-center justify-between w-full max-w-xs mx-auto mb-2" style={{ minHeight: 40 }}>
-      {/* Pause/Play button on the left */}
-      <button
-        aria-label={paused ? 'Resume' : 'Pause'}
-        onClick={() => {
-          setPaused(p => !p);
-        }}
-        className="text-gray-600 hover:text-gray-900 text-lg px-2 py-1 rounded-full bg-gray-200 hover:bg-gray-300 shadow transition-all focus:outline-none"
-        style={{ minWidth: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >
-        {paused ? (
-          // Play icon (right-facing triangle)
-          <svg width="1.1em" height="1.1em" viewBox="0 0 20 20" fill="none"><polygon points="7,5 15,10 7,15" fill="currentColor"/></svg>
-        ) : (
-          // Pause icon (two vertical bars)
-          <svg width="1.1em" height="1.1em" viewBox="0 0 20 20" fill="none"><rect x="6" y="5" width="2.5" height="10" rx="1" fill="currentColor"/><rect x="11.5" y="5" width="2.5" height="10" rx="1" fill="currentColor"/></svg>
-        )}
-      </button>
-      {/* Word display in the center */}
-      <div className="flex-1 flex justify-center items-center">
-        {word === '<br>' ? (
-          <div style={{height:32}}></div>
-        ) : word === '<section>' ? (
-          <div style={{height:32}}><span className="text-2xl text-gray-300">⸻</span></div>
-        ) : (
-          <div className="w-full text-center text-2xl font-mono text-gray-700 select-none" style={{minHeight:40, lineHeight:'40px'}}>
-            {word}
-          </div>
-        )}
-      </div>
-      {/* Speed controls on the right, vertical layout */}
-      <div className="flex flex-col items-center justify-center ml-2" style={{height: 40}}>
-        <button
-          aria-label="Speed up"
-          onClick={() => {
-            setMaxWpm(w => {
-              const newWpm = w + 100;
-              return newWpm;
-            });
-          }}
-          className="text-blue-700 hover:text-white text-base px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-500 shadow transition-all focus:outline-none mb-1"
-          style={{ minWidth: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          {/* Upward arrow icon */}
-          <svg width="1em" height="1em" viewBox="0 0 20 20" fill="none"><path d="M10 16V4M10 4L6 8M10 4L14 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-        </button>
-        <button
-          aria-label="Speed down"
-          onClick={() => {
-            setMaxWpm(w => {
-              const newWpm = Math.max(100, w - 100);
-              return newWpm;
-            });
-          }}
-          className="text-blue-700 hover:text-white text-base px-2 py-1 rounded-full bg-blue-100 hover:bg-blue-500 shadow transition-all focus:outline-none mt-1"
-          style={{ minWidth: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          {/* Downward arrow icon */}
-          <svg width="1em" height="1em" viewBox="0 0 20 20" fill="none"><path d="M10 4V16M10 16L6 12M10 16L14 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-        </button>
-      </div>
-    </div>
-  );
-  // Always render controls above the word display, even for breaks
-  return (
-    <div className="w-full flex flex-col items-center">
-      {controls}
-    </div>
-  );
-}
-
-// Utility: Check if an ssh-rsa key is 4096 bits
-function is4096RsaKey(sshKey: string): boolean {
-  if (!sshKey.startsWith('ssh-rsa ')) return false;
-  const b64 = sshKey.split(' ')[1];
-  const bytes = typeof Buffer !== 'undefined' ? Buffer.from(b64, 'base64') : Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  let offset = 0;
-  function readUint32() {
-    return (bytes[offset++] << 24) | (bytes[offset++] << 16) | (bytes[offset++] << 8) | (bytes[offset++]);
-  }
-  function readBuffer() {
-    const len = readUint32();
-    const buf = bytes.slice(offset, offset + len);
-    offset += len;
-    return buf;
-  }
-  readBuffer(); // type ('ssh-rsa')
-  readBuffer(); // e
-  let n = readBuffer(); // modulus
-  if (n[0] === 0x00) n = n.slice(1);
-  const firstByte = n[0];
-  let bits = (n.length - 1) * 8;
-  let b = firstByte;
-  while (b) { bits++; b >>= 1; }
-  return bits === 4096;
-}
 
 export default function Home() {
   const [loginOpen, setLoginOpen] = React.useState(false);
@@ -253,7 +25,7 @@ export default function Home() {
   const [userPubKey, setUserPubKey] = React.useState<string | null>(null);
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
-  const [members, setMembers] = React.useState<any[]>([]);
+  const [members, setMembers] = React.useState<GroupMember[]>([]);
   const [memberLoading, setMemberLoading] = React.useState(false);
   const [addUsername, setAddUsername] = React.useState("");
   const [adminMsg, setAdminMsg] = React.useState<string | null>(null);
@@ -262,20 +34,20 @@ export default function Home() {
   const [requestDesc, setRequestDesc] = React.useState("");
   const [requestMsg, setRequestMsg] = React.useState<string | null>(null);
   const [requestLoading, setRequestLoading] = React.useState(false);
-  const [requests, setRequests] = React.useState<any[]>([]);
+  const [requests, setRequests] = React.useState<OfficeRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = React.useState(false);
   const [verifyModalOpen, setVerifyModalOpen] = React.useState(false);
-  const [verifyRequest, setVerifyRequest] = React.useState<any>(null);
+  const [verifyRequest, setVerifyRequest] = React.useState<OfficeRequest | null>(null);
   const [deleteLoading, setDeleteLoading] = React.useState(false);
   const [keyModalOpen, setKeyModalOpen] = React.useState(false);
-  const [keyMember, setKeyMember] = React.useState<any>(null);
+  const [keyMember, setKeyMember] = React.useState<GroupMember | null>(null);
   const [selectedGroup, setSelectedGroup] = React.useState<string[]>([]);
   const [parcItKey, setParcItKey] = React.useState<string | null>(null);
   const [verifyResult, setVerifyResult] = React.useState<{valid: boolean, groupKeys?: string, nullifier?: Uint8Array | string, error?: any} | null>(null);
   const [isDoxxed, setIsDoxxed] = React.useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const emojiPickerRef = React.useRef<HTMLDivElement>(null);
-  const [admins, setAdmins] = React.useState<any[]>([]);
+  const [admins, setAdmins] = React.useState<Admin[]>([]);
   const [verifyLoading, setVerifyLoading] = React.useState(false);
   const verifyResultCache = React.useRef<Record<string, {valid: boolean, groupKeys?: string, error?: any}>>({});
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -369,28 +141,6 @@ export default function Home() {
     fetchAdmins();
   }, []);
 
-  // Remove member handler
-  const handleRemoveMember = async (id: string) => {
-    setAdminMsg(null);
-    setMemberLoading(true);
-    try {
-      const { error } = await supabase.from("group_members").delete().eq("id", id);
-      if (error) {
-        setAdminMsg("Failed to remove member: " + error.message);
-        console.error(error);
-      } else {
-        setAdminMsg("Member removed successfully.");
-        // Refresh member list
-        const { data } = await supabase.from("group_members").select("id, github_username, avatar_url, public_key");
-        setMembers(data || []);
-      }
-    } catch (e) {
-      setAdminMsg("Unexpected error removing member.");
-      console.error(e);
-    }
-    setMemberLoading(false);
-  };
-
   // When opening the Add Request modal, default to all members selected (only if selectedGroup is empty)
   useEffect(() => {
     if (addRequestOpen && selectedGroup.length === 0 && members.length > 0) {
@@ -474,14 +224,14 @@ export default function Home() {
     // ANONYMOUS: Existing flow (with loading/progress/proof UI)
     setRequestLoading(true);
     try {
-      let groupMembers = selectedGroup;
-      let doxxedMemberId = null;
+      const groupMembers = selectedGroup;
+      const doxxedMemberId = null;
       const message = `${requestEmoji} ${requestDesc}`;
       const groupKeys = members
         .filter((m) => groupMembers.includes(m.github_username))
         .map((m) => m.public_key)
         .join('\n');
-      let signature = await generateSignature(message, groupKeys, parcItKey);
+      const signature = await generateSignature(message, groupKeys, parcItKey);
       const { error } = await supabase.from("office_requests").insert({
         emoji: requestEmoji.trim(),
         description: requestDesc.trim(),
@@ -603,24 +353,6 @@ export default function Home() {
     setVerifyRequest(null);
   };
 
-  // Admin delete handler
-  const handleDeleteRequest = async (id: string) => {
-    setDeleteLoading(true);
-    try {
-      const { error } = await supabase.from("office_requests").update({ deleted: true }).eq("id", id);
-      if (error) {
-        alert("Failed to delete request: " + error.message);
-      } else {
-        handleCloseVerify();
-        fetchRequests();
-      }
-    } catch (e) {
-      alert("Unexpected error deleting request.");
-      console.error(e);
-    }
-    setDeleteLoading(false);
-  };
-
   // Open/close key modal
   const handleOpenKeyModal = (member: any) => {
     setKeyMember(member);
@@ -693,19 +425,21 @@ export default function Home() {
 
   return (
     <div className="retro-container">
-      <RetroHeader 
-        setLoginOpen={setLoginOpen}
-        loggedIn={loggedIn}
-        loading={loading}
-        isAdmin={isAdmin}
-        setLoggedIn={setLoggedIn}
-        setUserPubKey={setUserPubKey}
-        setIsAdmin={setIsAdmin}
-      />
+      <div style={{ width: '100%' }}>
+        <RetroHeader 
+          setLoginOpen={setLoginOpen}
+          loggedIn={loggedIn}
+          loading={loading}
+          setLoggedIn={setLoggedIn}
+          setUserPubKey={setUserPubKey}
+          setIsAdmin={setIsAdmin}
+        />
+      </div>
       {/* Main Layout: Sidebar + Feed */}
       <div className="flex flex-row max-w-7xl mx-auto mt-8">
         {/* Sidebar: Group Members */}
-        <aside className="w-64 bg-gray-100 border-r border-gray-300 p-4 flex flex-col gap-4 shadow-lg">
+        <aside className="w-64 mt-8 bg-gray-100 border-r border-gray-300 p-4 flex flex-col gap-4 shadow-lg"
+          style={{ height: 'auto', minHeight: 'unset', alignSelf: 'flex-start' }}>
           <h3 className="font-bold text-blue-800 mb-2">0XPARC Group Members</h3>
           <ul className="overflow-y-auto space-y-2">
             {members
@@ -739,13 +473,34 @@ export default function Home() {
               )}
             </ul>
           </div>
+          {/* Admin Portal button at the bottom */}
+          <a
+            href="/admin"
+            className="retro-btn mt-6"
+            style={{
+              background: 'transparent',
+              color: '#1a237e',
+              border: 'none',
+              textDecoration: 'underline',
+              fontWeight: 'normal',
+              fontSize: 14,
+              padding: 0,
+              display: 'block',
+              textAlign: 'center',
+              borderRadius: 0,
+              boxShadow: 'none',
+              marginTop: 24,
+            }}
+          >
+            Admin Portal
+          </a>
         </aside>
         {/* Main Feed Area */}
         <main className="flex-1 flex flex-col items-center px-8">
           {/* Custom Copy/Intro */}
           <section className="w-full max-w-2xl mt-8 mb-8 bg-white border-2 border-gray-400  shadow p-6">
             <h1 className="retro-title mb-2 flex items-center gap-2">📝 Parc-It <span className="text-purple-500">✦</span></h1>
-            <p className="retro-subtitle mb-2 text-lg">Every suggestion here was posted by a member of 0xPARC—but we don't know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
+            <p className="retro-subtitle mb-2 text-lg">Every office suggestion here was posted by a member of 0xPARC—but we don't know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
             <p className="text-sm text-gray-700">Submit requests for the office anonymously. Only group members can post, but no one (not even admins) can see who posted what.</p>
             <span className="blinking">✨ Verified by ZK Proofs ✨</span>
           </section>

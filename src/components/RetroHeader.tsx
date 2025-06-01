@@ -1,21 +1,29 @@
 import React from "react";
 
+interface RetroHeaderProps {
+  loggedIn: boolean;
+  loading: boolean;
+  setLoginOpen: (open: boolean) => void;
+  setLoggedIn: (loggedIn: boolean) => void;
+  setUserPubKey: (pubKey: string | null) => void;
+  setIsAdmin: (isAdmin: boolean) => void;
+}
+
 export default function RetroHeader({
   loggedIn,
   loading,
-  isAdmin,
   setLoginOpen,
   setLoggedIn,
   setUserPubKey,
   setIsAdmin
-}: any) {
+}: RetroHeaderProps) {
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
       background: '#000080',
       color: 'white',
-      padding: '4px 10px',
+      padding: '4px 100px',
       borderTopLeftRadius: 2,
       borderTopRightRadius: 2,
       borderBottom: '2px solid #fff',
@@ -43,24 +51,6 @@ export default function RetroHeader({
           Anonymous Office Request Board for 0xPARC
         </span>
       </span>
-      {/* Admin Portal link */}
-      <a
-        href="/admin"
-        className="retro-btn"
-        style={{
-          marginLeft: 40,
-          marginRight: 16,
-          fontSize: 14,
-          padding: '6px 18px',
-          background: '#fff',
-          color: '#000080',
-          border: '2px outset #888',
-          textDecoration: 'none',
-          fontWeight: 'bold',
-        }}
-      >
-        Admin Portal
-      </a>
       {/* Login/Logout UI */}
       <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
         {!loggedIn ? (

@@ -1,5 +1,5 @@
 /* tslint:disable */
-/* eslint-disable */
+ 
 export function validate_keys(public_keys: string, double_blind_key: string): KeyCheckResponse;
 export class Circuit {
   free(): void;

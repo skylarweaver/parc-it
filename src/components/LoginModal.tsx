@@ -58,7 +58,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               <ol className="list-decimal list-inside ml-4 mt-1 mb-1 text-xs">
                 <li>Copy the contents of <code>~/.ssh/id_rsa.pub</code></li>
                 <li>Go to <a href="https://github.com/settings/keys" target="_blank" rel="noopener noreferrer" className="underline text-blue-700">GitHub SSH keys settings</a></li>
-                <li>Click <b>"New SSH key"</b>, paste your public key, and save</li>
+                <li>Click <b>&quot;New SSH key&quot;</b>, paste your public key, and save</li>
               </ol>
               <span className="text-xs">This allows the app to fetch your public key and include you as a group member.</span>
             </li>

@@ -10,7 +10,7 @@ let Circuit: any = null;
 let validate_keys: any = null;
 let circuitInstance: any = null;
 let circuitReady: boolean = false;
-let requestQueue: any[] = [];
+const requestQueue: any[] = [];
 
 async function ensureWasmLoaded(caller = 'unknown') {
   console.log(`[Plonky2 Worker] ensureWasmLoaded called by: ${caller}`);
