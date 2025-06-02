@@ -32,3 +32,12 @@ CREATE TABLE admins (
   public_key text NOT NULL, -- hardcoded in backend for admin check
   github_username text
 );
+
+-- Table: request_upvotes (for anonymous upvoting with nullifiers)
+CREATE TABLE request_upvotes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id uuid NOT NULL REFERENCES office_requests(id),
+  nullifier text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (request_id, nullifier)
+);

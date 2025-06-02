@@ -225,7 +225,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 .retro-label {
   font-family: 'Tahoma', 'Courier New', monospace;
-  font-size: 13px;
+  font-size: 9px;
+  font-style: italic;
   font-weight: bold;
   background: #e0e0e0;
   border: 1px solid #888;

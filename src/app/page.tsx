@@ -3,12 +3,12 @@ import { Button } from "../components/ui/button";
 import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { generateSignature, verifySignature, getPlonky2Worker } from "../helpers/plonky2/utils";
+import { generateSignature, verifySignature, getPlonky2Worker, generateSignatureWithNullifier, to32ByteNonce } from "../helpers/plonky2/utils";
 import EmojiPicker, { Theme, EmojiStyle } from 'emoji-picker-react';
 import ProgressBar from "../components/ui/ProgressBar";
 import PLONKY2_SCRIPT from "./helpers/plonky2/plonky2Script";
 import RetroHeader from "../components/RetroHeader";
-import { OfficeRequest, GroupMember, Admin } from "../types/models";
+import { OfficeRequest, GroupMember, Admin, Upvote } from "../types/models";
 import { is4096RsaKey } from "../helpers/utils";
 import AnimatedEquation from "../components/AnimatedEquation";
 import ProofTimer from "../components/ProofTimer";
@@ -54,6 +54,9 @@ export default function Home() {
   const [pageSize, setPageSize] = React.useState(10);
   const [totalRequests, setTotalRequests] = React.useState(0);
   const [signatureLoading, setSignatureLoading] = React.useState(false);
+  const [upvoteLoading, setUpvoteLoading] = React.useState<string | null>(null);
+  const [upvoteMsg, setUpvoteMsg] = React.useState<{ [requestId: string]: string }>({});
+  const [upvoteCounts, setUpvoteCounts] = React.useState<{ [requestId: string]: number }>({});
 
   const handleLogin = async (key: string, pubKey: string) => {
     setLoading(true);
@@ -423,6 +426,95 @@ export default function Home() {
     };
   }, [showEmojiPicker]);
 
+  // Fetch upvote counts for all requests
+  const fetchUpvoteCounts = async (requestIds: string[]) => {
+    console.log('[Upvote] fetchUpvoteCounts called with requestIds:', requestIds);
+    if (!requestIds.length) return;
+    try {
+      const { data, error } = await supabase
+        .from('request_upvotes')
+        .select('request_id')
+        .in('request_id', requestIds);
+      if (error) {
+        console.error('[Upvote] Failed to fetch upvote counts:', error);
+        setUpvoteCounts({});
+      } else {
+        const counts: { [requestId: string]: number } = {};
+        (data || []).forEach((row: any) => {
+          counts[row.request_id] = (counts[row.request_id] || 0) + 1;
+        });
+        console.log('[Upvote] Upvote counts result:', counts);
+        setUpvoteCounts(counts);
+      }
+    } catch (e) {
+      console.error('[Upvote] Unexpected error fetching upvote counts:', e);
+      setUpvoteCounts({});
+    }
+  };
+
+  // Fetch upvote counts whenever requests change
+  useEffect(() => {
+    if (requests.length > 0) {
+      fetchUpvoteCounts(requests.map(r => r.id));
+    }
+  }, [requests]);
+
+  // Upvote handler
+  const handleUpvote = async (req: OfficeRequest) => {
+    console.log('[Upvote] handleUpvote called for request:', req);
+    if (!loggedIn || !parcItKey || !userPubKey) {
+      setUpvoteMsg((prev) => ({ ...prev, [req.id]: "You must be logged in to upvote." }));
+      console.warn('[Upvote] Not logged in or missing key');
+      return;
+    }
+    setUpvoteLoading(req.id);
+    setUpvoteMsg((prev) => ({ ...prev, [req.id]: "" }));
+    try {
+      // Use request ID as the nullifier context
+      const groupKeys = Array.isArray(req.group_members)
+        ? members.filter((m) => req.group_members.includes(m.github_username)).map((m) => m.public_key).join("\n")
+        : "";
+      console.log('[Upvote] groupKeys:', groupKeys);
+      if (!groupKeys) {
+        setUpvoteMsg((prev) => ({ ...prev, [req.id]: "No group keys found for this request." }));
+        setUpvoteLoading(null);
+        console.warn('[Upvote] No group keys found');
+        return;
+      }
+      const message = `${req.emoji} ${req.description}`;
+      console.log('[Upvote] message:', message);
+      // Hash the requestId to a 32-byte nonce
+      const nonce = await to32ByteNonce(req.id);
+      console.log(`[Upvote] Nonce for requestId ${req.id}:`, nonce, 'Length:', nonce.length);
+      // Generate group signature with nullifier
+      const signature = await generateSignatureWithNullifier(message, groupKeys, parcItKey, nonce);
+      console.log('[Upvote] generated signature:', signature);
+      // Send to backend endpoint
+      console.log('[Upvote] Sending POST to /api/upvote', { requestId: req.id, signature, message });
+      const res = await fetch('/api/upvote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: req.id, signature, message })
+      });
+      console.log('[Upvote] /api/upvote response status:', res.status);
+      const result = await res.json();
+      console.log('[Upvote] /api/upvote response body:', result);
+      if (res.ok && result.success) {
+        setUpvoteMsg((prev) => ({ ...prev, [req.id]: "Upvote submitted!" }));
+        // Refetch upvote counts
+        fetchUpvoteCounts([req.id]);
+      } else {
+        setUpvoteMsg((prev) => ({ ...prev, [req.id]: result.error || "Error submitting upvote." }));
+        console.warn('[Upvote] Upvote failed:', result.error);
+      }
+    } catch (e: any) {
+      setUpvoteMsg((prev) => ({ ...prev, [req.id]: e?.message || "Error submitting upvote." }));
+      console.error('[Upvote] Exception in handleUpvote:', e);
+    }
+    setUpvoteLoading(null);
+    console.log('[Upvote] handleUpvote finished for request:', req.id);
+  };
+
   return (
     <div className="retro-container">
       <div style={{ width: '100%' }}>
@@ -532,7 +624,7 @@ export default function Home() {
                       : [];
                     const isDoxxed = !!req.doxxed_member_id;
                     return (
-                      <li key={req.id} className="border-2 border-gray-400  p-4 bg-white shadow-sm">
+                      <li key={req.id} className="border-2 border-gray-400  p-4 bg-white shadow-sm relative">
                         <div className="flex items-center gap-4">
                           <span className="text-3xl w-10 text-center">{req.emoji}</span>
                           <span className="flex-1 flex items-center gap-2">
@@ -540,7 +632,20 @@ export default function Home() {
                             <span className="retro-label flex items-center gap-1">{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
                           </span>
                           <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="ml-2"
+                            onClick={() => handleUpvote(req)}
+                            disabled={!loggedIn || upvoteLoading === req.id /* || alreadyUpvoted */}
+                          >
+                            {upvoteLoading === req.id ? "Upvoting..." : "Upvote"}
+                          </Button>
                         </div>
+                        {/* Upvote count badge in bottom right */}
+                        <span className="absolute bottom-2 right-4 text-xs text-purple-800 font-mono bg-purple-100 px-2 py-1 rounded shadow border border-purple-300 retro-badge">
+                          {upvoteCounts[req.id] || 0} upvotes
+                        </span>
                         <div className="flex items-center gap-2 mt-2 ml-14">
                           {groupMemberObjs.slice(0, 5).map((m, idx) => (
                             <img
@@ -556,6 +661,9 @@ export default function Home() {
                             <span className="ml-1 px-2 py-0.5 bg-gray-200 text-xs rounded-full border border-gray-400 font-mono">+{groupMemberObjs.length - 5} more</span>
                           )}
                         </div>
+                        {upvoteMsg[req.id] && (
+                          <div className="text-xs mt-2 ml-14 text-purple-700">{upvoteMsg[req.id]}</div>
+                        )}
                       </li>
                     );
                   })}

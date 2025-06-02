@@ -5,6 +5,8 @@
 // { id: string, op: string, args: object }
 // Response: { id: string, result?: any, error?: string }
 
+import { verifySignatureWithWasm } from './verifyShared';
+
 let wasmMod: any = null;
 let Circuit: any = null;
 let validate_keys: any = null;
@@ -84,7 +86,8 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         console.log(`[Plonky2 Worker] Calling generateSignature for id=${id}`);
         const t0 = performance.now();
         const { message, publicKeys, dk } = args;
-        result = circuitInstance.generate_signature(message, publicKeys, dk);
+        const prover = circuitInstance.prover();
+        result = prover.generate_signature(message, publicKeys, dk);
         const t1 = performance.now();
         const duration = t1 - t0;
         console.log(`[Plonky2 Worker] generateSignature complete for id=${id} in ${duration.toFixed(0)} ms`);
@@ -116,30 +119,40 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         console.log(`[Plonky2 Worker] Calling verifySignature for id=${id}`);
         const t0 = performance.now();
         const { message, signature } = args;
-        try {
-          const { Verifier } = wasmMod;
-          const verifier = new Verifier();
-          console.log(`[Plonky2 Worker] About to call verifier.read_signature for id=${id}`);
-          const sigObj = verifier.read_signature(message, signature);
-          console.log(`[Plonky2 Worker] verifier.read_signature returned for id=${id}`);
-          // Extract groupKeys and nullifier if present
-          let groupKeys = undefined;
-          let nullifier = undefined;
-          if (typeof sigObj.public_keys === 'function') {
-            groupKeys = sigObj.public_keys().join('\n');
-          }
-          if (typeof sigObj.has_nullifier === 'function' && sigObj.has_nullifier()) {
-            nullifier = sigObj.nullifier();
-          }
-          result = { valid: true, groupKeys, nullifier };
-        } catch (error) {
-          console.error(`[Plonky2 Worker] Error in verifier.read_signature for id=${id}:`, error);
-          result = { valid: false, error };
-        }
+        result = verifySignatureWithWasm(wasmMod, message, signature);
         const t1 = performance.now();
         const duration = t1 - t0;
         console.log(`[Plonky2 Worker] verifySignature complete for id=${id} in ${duration.toFixed(0)} ms`);
         self.postMessage({ op: 'timing', operation: 'verifySignature', durationMs: Math.round(duration) });
+        self.postMessage({ id, result });
+        break;
+      }
+      case 'generateSignatureWithNullifier': {
+        console.log('[Plonky2 Worker] switch: generateSignatureWithNullifier');
+        if (!circuitReady) {
+          // Wait for circuit to be ready
+          requestQueue.push({ event, id, op, args });
+          return;
+        }
+        console.log(`[Plonky2 Worker] Calling generateSignatureWithNullifier for id=${id}`);
+        const t0 = performance.now();
+        const { message, publicKeys, dk, nonce } = args;
+        let nonceBytes;
+        if (typeof nonce === 'string') {
+          nonceBytes = Array.from(new TextEncoder().encode(nonce));
+        } else if (nonce instanceof Uint8Array) {
+          nonceBytes = Array.from(nonce);
+        } else if (Array.isArray(nonce)) {
+          nonceBytes = nonce;
+        } else {
+          nonceBytes = [];
+        }
+        const prover = circuitInstance.prover();
+        result = prover.generate_signature_with_nullifier(message, publicKeys, dk, nonceBytes);
+        const t1 = performance.now();
+        const duration = t1 - t0;
+        console.log(`[Plonky2 Worker] generateSignatureWithNullifier complete for id=${id} in ${duration.toFixed(0)} ms`);
+        self.postMessage({ op: 'timing', operation: 'generateSignatureWithNullifier', durationMs: Math.round(duration) });
         self.postMessage({ id, result });
         break;
       }

@@ -76,11 +76,29 @@ export async function generateSignature(message: string, publicKeys: string, dk:
 }
 
 /**
- * Verifies a signature for a message and returns group keys if valid.
+ * Verifies a signature for a message and returns group keys and nullifier if valid.
  * Offloaded to Plonky2 worker for consistency and performance.
  */
-export async function verifySignature(message: string, signature: string): Promise<{valid: boolean, groupKeys?: string, error?: any}> {
+export async function verifySignature(message: string, signature: string): Promise<{valid: boolean, groupKeys?: string, nullifier?: Uint8Array | string, error?: any}> {
   return plonky2WorkerCall('verifySignature', { message, signature });
+}
+
+/**
+ * Generates a group signature with a nullifier for a message (e.g., for upvoting).
+ * The nonce should be unique per (user, action), e.g., the request ID.
+ */
+export async function generateSignatureWithNullifier(message: string, publicKeys: string, dk: string, nonce: string | Uint8Array | number[]): Promise<string> {
+  return plonky2WorkerCall('generateSignatureWithNullifier', { message, publicKeys, dk, nonce });
+}
+
+/**
+ * Hashes an input string to a 32-byte (SHA-256) Uint8Array for use as a nonce.
+ */
+export async function to32ByteNonce(input: string): Promise<Uint8Array> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(hashBuffer);
 }
 
 // await wasmMod.default({ url: wasmUrl }); 

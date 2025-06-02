@@ -20,6 +20,66 @@ Key differences from double-blind:
 - **Extensibility:** Future support for upvotes, comments, and more cryptographic features.
 - **Documentation:** All documentation will be placed in a dedicated docs folder.
 
+# Upvoting Feature with Nullifiers (Plonky2 Group Signature)
+
+## Background and Motivation
+
+- Enable anonymous upvoting of office requests, ensuring each group member can upvote each request only once.
+- Use the new Plonky2 WASM group signature API with nullifier support to enforce one-vote-per-user-per-request, while preserving anonymity.
+- Nullifiers are cryptographic values unique to (user, request) but unlinkable to user identity.
+
+## Key Challenges and Analysis
+
+- **Nullifier Generation:**
+  - Must be unique per (user, request) and unlinkable to user.
+  - Use request ID as the nullifier context when generating the group signature.
+- **Signature Verification:**
+  - Backend must verify the group signature and extract the nullifier using the WASM verifier.
+  - Prevent double-voting by checking if the nullifier already exists for the request.
+- **Data Model:**
+  - Store upvote records as (request_id, nullifier, timestamp) in a new table.
+  - Enforce uniqueness on (request_id, nullifier).
+- **UI/UX:**
+  - Upvote button on each request.
+  - Show upvote count.
+  - Disable upvote button if already upvoted (if possible to check on client).
+  - Show feedback if user tries to upvote twice.
+- **Security:**
+  - Only group members can upvote (enforced by group signature verification).
+  - Nullifiers must not be guessable or linkable to users.
+
+## High-level Task Breakdown (Upvoting)
+
+1. **Update Data Model**
+   - [x] Add `request_upvotes` table: `id`, `request_id`, `nullifier`, `created_at`.
+   - [x] Add unique constraint on (`request_id`, `nullifier`).
+
+2. **Client: Upvote Flow**
+   - [ ] Add upvote button to each request in the UI.
+   - [ ] On click, generate group signature with nullifier (context = request ID).
+   - [ ] Send signature and request ID to backend.
+
+3. **Backend: Upvote Endpoint**
+   - [ ] Edge Function: verify group signature and extract nullifier using WASM.
+   - [ ] Check if nullifier already exists for this request.
+   - [ ] If not, record upvote; if yes, reject as duplicate.
+
+4. **Client: Upvote State**
+   - [ ] Fetch upvote counts for each request.
+   - [ ] Optionally, fetch whether current user has upvoted (if possible without deanonymizing).
+   - [ ] Disable upvote button if already upvoted.
+
+5. **Testing**
+   - [ ] Test upvote flow, double-voting prevention, and anonymity.
+
+## Success Criteria (Upvoting)
+- Users can upvote requests anonymously.
+- Each user can upvote each request only once.
+- Upvote counts are accurate.
+- No user can upvote as a non-member.
+- No user can upvote the same request twice.
+- No user's identity is revealed by upvoting.
+
 # High-level Task Breakdown
 
 1. **Project Scaffolding**
@@ -173,6 +233,9 @@ Key differences from double-blind:
 - [In Progress] Refactoring admin privilege logic to use Supabase `admins` table and updating admin message UI for color feedback.
 - [In Progress] Implementing always-visible Add Request button, disabled unless logged in, as first step of request feed and submission feature.
 - [In Progress] Adding multi-select group member UI to Add Request modal, updating request submission to include only the selected group, and preparing Supabase schema changes (remove posted_by, add group_members array).
+- Added `request_upvotes` table to `docs/schema.sql` for anonymous upvoting with nullifiers. Table includes unique constraint on (request_id, nullifier) to prevent double-voting.
+- Next: Implement upvote button in the UI and client-side signature generation with nullifier.
+- [x] Deduplicate Plonky2 signature verification logic: created verifyShared.ts, refactored both workers to use it. All verification logic is now DRY and consistent.
 
 # Lessons
 

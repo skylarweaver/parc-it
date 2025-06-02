@@ -1,6 +1,8 @@
 // Plonky2 Verifier Web Worker for lightweight signature verification only
 // Handles only verification requests, does NOT initialize or use the circuit
 
+import { verifySignatureWithWasm } from './verifyShared';
+
 let verifierWasmMod: any = null;
 
 async function ensureWasmLoaded() {
@@ -26,25 +28,7 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         console.log('[Verifier Worker] switch: verifySignature');
         const t0 = performance.now();
         const { message, signature } = args;
-        try {
-          const { Verifier } = verifierWasmMod;
-          const verifier = new Verifier();
-          console.log(`[Verifier Worker] About to call verifier.read_signature for id=${id}`);
-          const sigObj = verifier.read_signature(message, signature);
-          console.log(`[Verifier Worker] verifier.read_signature returned for id=${id}`);
-          let groupKeys = undefined;
-          let nullifier = undefined;
-          if (typeof sigObj.public_keys === 'function') {
-            groupKeys = sigObj.public_keys().join('\n');
-          }
-          if (typeof sigObj.has_nullifier === 'function' && sigObj.has_nullifier()) {
-            nullifier = sigObj.nullifier();
-          }
-          result = { valid: true, groupKeys, nullifier };
-        } catch (error) {
-          console.error(`[Verifier Worker] Error in verifier.read_signature for id=${id}:`, error);
-          result = { valid: false, error };
-        }
+        result = verifySignatureWithWasm(verifierWasmMod, message, signature);
         const t1 = performance.now();
         const duration = t1 - t0;
         console.log(`[Verifier Worker] verifySignature complete for id=${id} in ${duration.toFixed(0)} ms`);
