@@ -180,6 +180,7 @@ Key differences from double-blind:
   - [ ] Sidebar group members
   - [ ] Retro styling
 - [In Progress] Implement group member selection in Add Request modal, remove submitter identity from requests, and update backend schema.
+- [ ] TODO: Use [jscpd](https://github.com/kucherenko/jscpd) to detect and deduplicate code across the codebase
 
 # Success Criteria for Data Models & Supabase Schema
 
