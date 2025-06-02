@@ -857,9 +857,9 @@ export default function Home() {
             {requestLoading && <ProgressBar />}
             {requestLoading && <ProofTimer loading={requestLoading} />}
             {/* TEMPORARY: Hiding SpeedReader from request submission for demo. Restore after demo. */}
-            {false && (requestLoading || (requestMsg && requestMsg.includes('proof has been generated'))) && (
+            {/* {false && (requestLoading || (requestMsg && requestMsg.includes('proof has been generated'))) && (
               <SpeedReader script={PLONKY2_SCRIPT} loading={Boolean(requestLoading || (requestMsg && requestMsg.includes('proof has been generated')))} />
-            )}
+            )} */}
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" onClick={() => setAddRequestOpen(false)} disabled={requestLoading}>
                 {requestMsg && requestMsg.includes('proof has been generated') ? 'Close' : 'Cancel'}
@@ -962,12 +962,12 @@ export default function Home() {
                 {verifyLoading && <ProgressBar />}
                 {verifyLoading && <ProofTimer loading={verifyLoading} />}
                 {/* TEMPORARY: Hiding SpeedReader from signature verification for demo. Restore after demo. */}
-                {false && verifyLoading && <SpeedReader script={PLONKY2_SCRIPT} loading={verifyLoading} />}
+                {/* {false && verifyLoading && <SpeedReader script={PLONKY2_SCRIPT} loading={verifyLoading} />} */}
                 {verifyResult && (
                   <div className={`mb-4 ${verifyResult.valid ? 'text-green-700 bg-green-50 border border-green-200 rounded' : ''}`}>
                     <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
 {verifyResult.valid
-  ? `Proof Generated ✅\nSignature is valid!\nGroup keys:\n${verifyResult.groupKeys}`
+  ? `Proof Generated ✅\nSignature is valid!\nGroup keys: (which you can manually compare above)\n${verifyResult.groupKeys}`
   : `Invalid signature: ${verifyResult.error?.message || String(verifyResult.error)}`}
                     </pre>
                     {/* Nullifier display: only for upvotes (not regular group signatures) */}
