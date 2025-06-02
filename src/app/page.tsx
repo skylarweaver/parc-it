@@ -490,10 +490,14 @@ export default function Home() {
       const signature = await generateSignatureWithNullifier(message, groupKeys, parcItKey, nonce);
       console.log('[Upvote] generated signature:', signature);
       // Send to backend endpoint
-      console.log('[Upvote] Sending POST to /api/upvote', { requestId: req.id, signature, message });
-      const res = await fetch('/api/upvote', {
+      // console.log('[Upvote] Sending POST to /api/upvote', { requestId: req.id, signature, message });
+      const edgeFunctionUrl = 'https://ihoatybozktclkxgemsz.supabase.co/functions/v1/upvote';
+      const res = await fetch(edgeFunctionUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlob2F0eWJvemt0Y2xreGdlbXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1MzgxODMsImV4cCI6MjA2NDExNDE4M30.cJvF7ddfTkf6VNKopn9sP5yVLGHaaBTw3Um1eanCkfw`
+        },
         body: JSON.stringify({ requestId: req.id, signature, message })
       });
       console.log('[Upvote] /api/upvote response status:', res.status);
@@ -518,14 +522,14 @@ export default function Home() {
   return (
     <div className="retro-container">
       <div style={{ width: '100%' }}>
-        <RetroHeader 
-          setLoginOpen={setLoginOpen}
-          loggedIn={loggedIn}
-          loading={loading}
-          setLoggedIn={setLoggedIn}
-          setUserPubKey={setUserPubKey}
-          setIsAdmin={setIsAdmin}
-        />
+      <RetroHeader 
+        setLoginOpen={setLoginOpen}
+        loggedIn={loggedIn}
+        loading={loading}
+        setLoggedIn={setLoggedIn}
+        setUserPubKey={setUserPubKey}
+        setIsAdmin={setIsAdmin}
+      />
       </div>
       {/* Main Layout: Sidebar + Feed */}
       <div className="flex flex-row max-w-7xl mx-auto mt-8">

@@ -36,9 +36,46 @@ export default function AdminPage() {
 
   // Fetch data on mount for everyone
   useEffect(() => {
-    fetchRequests();
-    fetchMembers();
-    fetchAdmins();
+    // Fetch members
+    const loadMembers = async () => {
+      setMemberLoading(true);
+      try {
+        const membersData = await fetchMembers();
+        setMembers(membersData);
+      } catch {
+        setMembers([]);
+      }
+      setMemberLoading(false);
+    };
+    // Fetch requests
+    const loadRequests = async () => {
+      setRequestsLoading(true);
+      try {
+        const { data } = await fetchRequests();
+        setRequests(data);
+      } catch {
+        setRequests([]);
+      }
+      setRequestsLoading(false);
+    };
+    // Fetch admins
+    const loadAdmins = async () => {
+      setAdminLoading(true);
+      try {
+        const adminsData = await fetchAdmins();
+        setAdmins(adminsData);
+      } catch {
+        setAdmins([]);
+      }
+      setAdminLoading(false);
+    };
+    // Make these functions available to handlers
+    (window as any).loadMembers = loadMembers;
+    (window as any).loadRequests = loadRequests;
+    (window as any).loadAdmins = loadAdmins;
+    loadMembers();
+    loadRequests();
+    loadAdmins();
   }, []);
 
   const handleLogin = async (key: string, pubKey: string) => {
@@ -79,7 +116,7 @@ export default function AdminPage() {
     setDeleteLoading(true);
     try {
       await supabase.from("office_requests").update({ deleted: true }).eq("id", id);
-      await fetchRequests();
+      await (window as any).loadRequests();
     } catch {}
     setDeleteLoading(false);
   };
@@ -125,10 +162,11 @@ export default function AdminPage() {
       } else {
         setAdminMsg("Member added successfully.");
         setAddUsername("");
-        await fetchMembers();
+        await (window as any).loadMembers();
       }
-    } catch {
-      setAdminMsg("Unexpected error adding member.");
+    } catch (e: any) {
+      console.error(e);
+      setAdminMsg("Unexpected error adding member: " + (e?.message || JSON.stringify(e)));
     }
     setMemberLoading(false);
   };
@@ -139,7 +177,7 @@ export default function AdminPage() {
     setMemberLoading(true);
     try {
       await supabase.from("group_members").delete().eq("id", id);
-      await fetchMembers();
+      await (window as any).loadMembers();
     } catch {}
     setMemberLoading(false);
   };
@@ -182,10 +220,11 @@ export default function AdminPage() {
       } else {
         setAdminAdminMsg("Admin added successfully.");
         setAddAdminUsername("");
-        await fetchAdmins();
+        await (window as any).loadAdmins();
       }
-    } catch (e) {
-      setAdminAdminMsg("Unexpected error adding admin.");
+    } catch (e: any) {
+      console.error(e);
+      setAdminAdminMsg("Unexpected error adding admin: " + (e?.message || JSON.stringify(e)));
     }
     setAdminLoading(false);
   };
@@ -201,7 +240,7 @@ export default function AdminPage() {
         return;
       }
       await supabase.from("admins").delete().eq("id", id);
-      await fetchAdmins();
+      await (window as any).loadAdmins();
       setAdminAdminMsg("Admin removed successfully.");
     } catch (e) {
       setAdminAdminMsg("Unexpected error removing admin.");

@@ -22,7 +22,7 @@ export interface Admin {
   id: string;
   github_username: string;
   public_key?: string; // Some usages omit public_key
-}
+} 
 
 export interface Upvote {
   id: string;
