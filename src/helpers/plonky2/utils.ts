@@ -98,7 +98,9 @@ export async function to32ByteNonce(input: string): Promise<Uint8Array> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return new Uint8Array(hashBuffer);
+  const nonce = new Uint8Array(hashBuffer);
+  console.log(`[to32ByteNonce] input: ${input}, nonce (hex): ${Array.from(nonce).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+  return nonce;
 }
 
 // await wasmMod.default({ url: wasmUrl }); 

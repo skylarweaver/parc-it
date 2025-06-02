@@ -636,6 +636,8 @@ export default function Home() {
                             <span className="retro-label flex items-center gap-1">{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
                           </span>
                           <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
+                          {/* TEMPORARY: Hiding upvote button for demo. Restore after demo. */}
+                          {false && (
                           <Button
                             variant="default"
                             size="sm"
@@ -645,11 +647,14 @@ export default function Home() {
                           >
                             {upvoteLoading === req.id ? "Upvoting..." : "Upvote"}
                           </Button>
+                          )}
                         </div>
-                        {/* Upvote count badge in bottom right */}
+                        {/* TEMPORARY: Hiding upvote count for demo. Restore after demo. */}
+                        {false && (
                         <span className="absolute bottom-2 right-4 text-xs text-purple-800 font-mono bg-purple-100 px-2 py-1 rounded shadow border border-purple-300 retro-badge">
                           {upvoteCounts[req.id] || 0} upvotes
                         </span>
+                        )}
                         <div className="flex items-center gap-2 mt-2 ml-14">
                           {groupMemberObjs.slice(0, 5).map((m, idx) => (
                             <img

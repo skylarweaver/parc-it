@@ -87,7 +87,8 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
         const t0 = performance.now();
         const { message, publicKeys, dk } = args;
         const prover = circuitInstance.prover();
-        result = prover.generate_signature(message, publicKeys, dk);
+        const sigObj = prover.generate_signature(message, publicKeys, dk);
+        result = sigObj.signature();
         const t1 = performance.now();
         const duration = t1 - t0;
         console.log(`[Plonky2 Worker] generateSignature complete for id=${id} in ${duration.toFixed(0)} ms`);
@@ -148,7 +149,8 @@ async function handleRequest(event: MessageEvent, id: string, op: string, args: 
           nonceBytes = [];
         }
         const prover = circuitInstance.prover();
-        result = prover.generate_signature_with_nullifier(message, publicKeys, dk, nonceBytes);
+        const sigObj = prover.generate_signature_with_nullifier(message, publicKeys, dk, nonceBytes);
+        result = sigObj.signature();
         const t1 = performance.now();
         const duration = t1 - t0;
         console.log(`[Plonky2 Worker] generateSignatureWithNullifier complete for id=${id} in ${duration.toFixed(0)} ms`);

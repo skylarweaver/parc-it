@@ -51,7 +51,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             You need to generate a special SSH signature using your SSH private key. Your SSH private key never leaves your machine. Your SSH public key is stored client-side only.
           </p>
           <ol className="list-decimal list-inside mb-2">
-            <li>Make sure you have an <strong>RSA SSH keypair</strong> (e.g. <code>~/.ssh/id_rsa</code>). If you don&apos;t, generate one with:<br />
+            <li>Make sure you have a <strong>4096-bit RSA SSH keypair</strong> (e.g. <code>~/.ssh/id_rsa</code>). If you don&apos;t, generate one with:<br />
               <pre className="bg-gray-300 rounded p-2 mt-1 text-xs overflow-x-auto">ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""</pre>
             </li>
             <li className="mt-2"><b>Add your new public key to your GitHub account</b> (if you haven&apos;t already):<br />
@@ -60,14 +60,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
                 <li>Go to <a href="https://github.com/settings/keys" target="_blank" rel="noopener noreferrer" className="underline text-blue-700">GitHub SSH keys settings</a></li>
                 <li>Click <b>&quot;New SSH key&quot;</b>, paste your public key, and save</li>
               </ol>
-              <span className="text-xs">This allows the app to fetch your public key and include you as a group member.</span>
+              <span className="text-xs">This allows Parc-It to fetch your public key and include you as a 0xPARC member.</span>
             </li>
             <li className="mt-2"><b>Generate your Parc-It Key </b>(SSH signature) with:<br />
               <pre className="bg-gray-300 rounded p-2 mt-1 text-xs overflow-x-auto">echo "E PLURIBUS UNUM; DO NOT SHARE" | ssh-keygen -Y sign -n double-blind.xyz -f ~/.ssh/id_rsa</pre>
             </li>
             <li className="mt-2"><b>Copy the full output </b>(including the BEGIN/END lines) and paste it below.</li>
           </ol>
-          <p className="text-xs text-gray-500">For more details, see the <a href="https://github.com/doubleblind-xyz/double-blind" target="_blank" rel="noopener noreferrer" className="underline">double-blind documentation</a>.</p>
+          {/* <p className="text-xs text-gray-500">For more details, see the <a href="https://github.com/doubleblind-xyz/double-blind" target="_blank" rel="noopener noreferrer" className="underline">double-blind documentation</a>.</p> */}
           {admin && (
             <div className="mt-4 text-red-600 font-semibold text-sm">
               Warning: If you log in as an admin, your SSH public key will be sent to the server for admin verification. For maximum privacy, allow time between performing admin actions and sending anonymous office requests.
