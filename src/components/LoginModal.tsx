@@ -13,6 +13,8 @@ interface LoginModalProps {
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, groupPublicKeys, admin }) => {
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
+  const [copied1, setCopied1] = useState(false);
+  const [copied2, setCopied2] = useState(false);
 
   if (!isOpen) return null;
 
@@ -52,7 +54,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           </p>
           <ol className="list-decimal list-inside mb-2">
             <li>Make sure you have a <strong>4096-bit RSA SSH keypair</strong> (e.g. <code>~/.ssh/id_rsa</code>). If you don&apos;t, generate one with:<br />
-              <pre className="bg-gray-300 rounded p-2 mt-1 text-xs overflow-x-auto">ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""</pre>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <pre className="bg-gray-300 rounded p-2 mt-1 text-xs overflow-x-auto" style={{ flex: 1 }}>ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""</pre>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Copy command"
+                  style={{ minWidth: 32, minHeight: 32, padding: 0 }}
+                  onClick={() => {
+                    navigator.clipboard.writeText('ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""');
+                    setCopied1(true);
+                    setTimeout(() => setCopied1(false), 1200);
+                  }}
+                >
+                  <svg width="1.2em" height="1.2em" viewBox="0 0 20 20" fill="none"><rect x="7" y="3" width="8" height="12" rx="2" stroke="#222" strokeWidth="1.5"/><rect x="5" y="5" width="8" height="12" rx="2" fill="#fff" stroke="#222" strokeWidth="1.5"/></svg>
+                </Button>
+                {copied1 && <span className="text-green-600 text-xs ml-1">Copied!</span>}
+              </div>
             </li>
             <li className="mt-2"><b>Add your new public key to your GitHub account</b> (if you haven&apos;t already):<br />
               <ol className="list-decimal list-inside ml-4 mt-1 mb-1 text-xs">
@@ -63,7 +81,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               <span className="text-xs">This allows Parc-It to fetch your public key and include you as a 0xPARC member.</span>
             </li>
             <li className="mt-2"><b>Generate your Parc-It Key </b>(SSH signature) with:<br />
-              <pre className="bg-gray-300 rounded p-2 mt-1 text-xs overflow-x-auto">echo "E PLURIBUS UNUM; DO NOT SHARE" | ssh-keygen -Y sign -n double-blind.xyz -f ~/.ssh/id_rsa</pre>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <pre className="bg-gray-300 rounded p-2 mt-1 text-xs overflow-x-auto" style={{ flex: 1 }}>echo "E PLURIBUS UNUM; DO NOT SHARE" | ssh-keygen -Y sign -n double-blind.xyz -f ~/.ssh/id_rsa</pre>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Copy command"
+                  style={{ minWidth: 32, minHeight: 32, padding: 0 }}
+                  onClick={() => {
+                    navigator.clipboard.writeText('echo "E PLURIBUS UNUM; DO NOT SHARE" | ssh-keygen -Y sign -n double-blind.xyz -f ~/.ssh/id_rsa');
+                    setCopied2(true);
+                    setTimeout(() => setCopied2(false), 1200);
+                  }}
+                >
+                  <svg width="1.2em" height="1.2em" viewBox="0 0 20 20" fill="none"><rect x="7" y="3" width="8" height="12" rx="2" stroke="#222" strokeWidth="1.5"/><rect x="5" y="5" width="8" height="12" rx="2" fill="#fff" stroke="#222" strokeWidth="1.5"/></svg>
+                </Button>
+                {copied2 && <span className="text-green-600 text-xs ml-1">Copied!</span>}
+              </div>
             </li>
             <li className="mt-2"><b>Copy the full output </b>(including the BEGIN/END lines) and paste it below.</li>
           </ol>
