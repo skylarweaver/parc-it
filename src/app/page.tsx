@@ -44,7 +44,7 @@ export default function Home() {
   const [selectedGroup, setSelectedGroup] = React.useState<string[]>([]);
   const [parcItKey, setParcItKey] = React.useState<string | null>(null);
   const [verifyResult, setVerifyResult] = React.useState<{valid: boolean, groupKeys?: string, nullifier?: Uint8Array | string, error?: any} | null>(null);
-  const [isDoxxed, setIsDoxxed] = React.useState(false);
+  const [isDoxxed, setIsDoxxed] = React.useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const emojiPickerRef = React.useRef<HTMLDivElement>(null);
   const [admins, setAdmins] = React.useState<Admin[]>([]);
@@ -155,6 +155,13 @@ export default function Home() {
     // eslint-disable-next-line
   }, [addRequestOpen]);
 
+  // Add this useEffect after the isDoxxed state declaration:
+  useEffect(() => {
+    if (addRequestOpen) {
+      setIsDoxxed(true); // Doxxed is default
+    }
+  }, [addRequestOpen]);
+
   // Add Request modal submit handler
   const handleSubmitRequest = async () => {
     setRequestMsg(null);
@@ -232,44 +239,41 @@ export default function Home() {
       const message = `${requestEmoji} ${requestDesc}`;
       const groupKeys = members
         .filter((m) => groupMembers.includes(m.github_username))
-        .map((m) => m.public_key)
-        .join('\n');
-      const signature = await generateSignature(message, groupKeys, parcItKey);
-      const { error } = await supabase.from("office_requests").insert({
-        emoji: requestEmoji.trim(),
-        description: requestDesc.trim(),
-        signature,
-        group_id: "00000000-0000-0000-0000-000000000000", // TODO: real group logic
-        public_signal: "dummy-signal", // TODO: real signal
-        group_members: groupMembers,
-        doxxed_member_id: doxxedMemberId,
-        deleted: false,
-        metadata: {},
+        .map((m) => m.public_key);
+      const signature = await generateSignature(message, groupKeys.join('\n'), parcItKey);
+      // POST to Edge Function
+      const officeRequestFunctionUrl = process.env.NEXT_PUBLIC_OFFICE_REQUEST_FUNCTION_URL!;
+      console.log("officeRequestFunctionUrl", officeRequestFunctionUrl);
+      const res = await fetch(officeRequestFunctionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseAnonKey}`
+        },
+        body: JSON.stringify({
+          description: requestDesc.trim(),
+          emoji: requestEmoji.trim(),
+          group: groupKeys,
+          signature,
+          doxxed_member_id: doxxedMemberId,
+        }),
       });
-      if (error) {
-        let msg = "Failed to submit request: " + error.message;
-        if (error instanceof Error) {
-          if (error.message.includes("does not match any public key")) {
-            msg = "Your Parc-It key is not a member of the selected group. Please check your group selection or log in with the correct key.";
-          } else {
-            msg = error.message;
-          }
-        }
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        let msg = data.error || "Failed to submit request.";
         setRequestMsg(msg);
       } else {
         setRequestMsg("Your proof has been generated and is ready to use.");
         setRequestEmoji("");
         setRequestDesc("");
+        // Refresh the request list
+        fetchRequests(currentPage, pageSize);
         // Do NOT close the modal automatically; let the user close it
       }
     } catch (e) {
       let msg = "Unexpected error submitting request.";
       if (e instanceof Error) {
-        if (e.message.includes("does not match any public key")) {
-          msg = "Your Parc-It key is not a member of the selected group. Please check your group selection or log in with the correct key.";
-        } else {
-          msg = e.message;
-        }
+        msg = e.message;
       }
       setRequestMsg(msg);
       console.error(e);
@@ -490,13 +494,12 @@ export default function Home() {
       const signature = await generateSignatureWithNullifier(message, groupKeys, parcItKey, nonce);
       console.log('[Upvote] generated signature:', signature);
       // Send to backend endpoint
-      // console.log('[Upvote] Sending POST to /api/upvote', { requestId: req.id, signature, message });
-      const edgeFunctionUrl = 'https://ihoatybozktclkxgemsz.supabase.co/functions/v1/upvote';
-      const res = await fetch(edgeFunctionUrl, {
+      const upvoteFunctionUrl = process.env.NEXT_PUBLIC_UPVOTE_FUNCTION_URL!;
+      const res = await fetch(upvoteFunctionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlob2F0eWJvemt0Y2xreGdlbXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1MzgxODMsImV4cCI6MjA2NDExNDE4M30.cJvF7ddfTkf6VNKopn9sP5yVLGHaaBTw3Um1eanCkfw`
+          'Authorization': `Bearer ${supabaseAnonKey}`
         },
         body: JSON.stringify({ requestId: req.id, signature, message })
       });
@@ -738,24 +741,24 @@ export default function Home() {
             {/* Toggle for Anonymous/Doxxed */}
             <div className="mb-4">
               <div className="flex items-center gap-4">
-                <span className={`text-base font-semibold transition-colors duration-200 ${!isDoxxed ? 'text-[#1a237e]' : 'text-gray-500'}`}>Anonymous</span>
+                <span className={`text-base font-semibold transition-colors duration-200 ${isDoxxed ? 'text-[#1a237e]' : 'text-gray-500'}`}>Doxxed</span>
                 <button
                   type="button"
                   className={`relative w-12 h-7 rounded-full border-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400
-                    ${isDoxxed ? 'bg-blue-600 border-blue-700' : 'bg-gray-300 border-gray-400'}`}
+                    ${!isDoxxed ? 'bg-blue-600 border-blue-700' : 'bg-gray-300 border-gray-400'}`}
                   onClick={() => setIsDoxxed(!isDoxxed)}
                   disabled={requestLoading}
-                  aria-pressed={isDoxxed}
-                  aria-label="Toggle anonymous/doxxed"
+                  aria-pressed={!isDoxxed}
+                  aria-label="Toggle doxxed/anonymous"
                   tabIndex={0}
                 >
                   <span
                     className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-200
-                      ${isDoxxed ? 'translate-x-5' : 'translate-x-0'}`}
+                      ${!isDoxxed ? 'translate-x-5' : 'translate-x-0'}`}
                     style={{ boxShadow: '0 2px 6px rgba(0,0,0,0.10)' }}
                   />
                 </button>
-                <span className={`text-base font-semibold transition-colors duration-200 ${isDoxxed ? 'text-[#1a237e]' : 'text-gray-500'}`}>Doxxed</span>
+                <span className={`text-base font-semibold transition-colors duration-200 ${!isDoxxed ? 'text-[#1a237e]' : 'text-gray-500'}`}>Anonymous</span>
               </div>
               <div className="mt-1">
                 <span className="text-xs text-gray-500">{isDoxxed ? "Your username will be shown with this request." : "Your request will be anonymous among the group you select below."}</span>

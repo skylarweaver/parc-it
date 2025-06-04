@@ -139,16 +139,17 @@ export default function AdminPage() {
         setMemberLoading(false);
         return;
       }
-      let public_key = (keysData.keys || []).find((k: string) => k.startsWith("ssh-rsa ")) || "";
-      public_key = public_key.trim();
-      if (!public_key) {
-        setAdminMsg("No ssh-rsa public key found for this GitHub user.");
-        setMemberLoading(false);
-        return;
+      // Find the first 4096-bit ssh-rsa key
+      let public_key = "";
+      const sshRsaKeys = (keysData.keys || []).filter((k: string) => k.startsWith("ssh-rsa "));
+      for (const key of sshRsaKeys) {
+        if (is4096RsaKey(key)) {
+          public_key = key.trim();
+          break;
+        }
       }
-      const is4096 = is4096RsaKey(public_key);
-      if (!is4096) {
-        setAdminMsg("This user does not have a 4096-bit RSA public key on their GitHub profile. Please ask them to generate one and add it to their GitHub account.");
+      if (!public_key) {
+        setAdminMsg("No 4096-bit ssh-rsa public key found for this GitHub user. Please ask them to generate one and add it to their GitHub account.");
         setMemberLoading(false);
         return;
       }

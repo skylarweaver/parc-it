@@ -25,7 +25,7 @@ CREATE TABLE office_requests (
   emoji text NOT NULL,
   description text NOT NULL,
   signature jsonb, -- now nullable
-  group_id uuid NOT NULL, -- for future multi-group support
+  group_id uuid, -- for future multi-group support, now nullable
   public_signal text NOT NULL, -- hash of message or similar
   group_members text[], -- now nullable
   doxxed_member_id uuid REFERENCES group_members(id), -- nullable, for doxxed requests

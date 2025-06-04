@@ -30,7 +30,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
       const groupKeysArray = groupPublicKeys.split('\n');
       console.log({ groupPublicKeys, groupKeysArray, idx, result });
       if (idx === undefined || idx < 0 || idx >= groupKeysArray.length) {
-        setError("Your Parc-It key is recognized, but the associated public key could not be found in the group.");
+        setError("Your Parc-It key is recognized, but the associated public key could not be found in the group. Message an admin to add you to the group.");
         return;
       }
       const userPubKey = groupKeysArray[idx];
