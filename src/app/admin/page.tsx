@@ -3,9 +3,11 @@ import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "../../components/ui/button";
 import { LoginModal } from "../../components/LoginModal";
-import { OfficeRequest, GroupMember, Admin } from "../../types/models";
+import { useMembers } from "../../helpers/hooks/useMembers";
+import { useAdmins } from "../../helpers/hooks/useAdmins";
+import { useRequests } from "../../helpers/hooks/useRequests";
 import { is4096RsaKey } from "../../helpers/utils";
-import { fetchAdmins, fetchMembers, fetchRequests } from "../../helpers/utils";
+import Link from "next/link";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -17,65 +19,29 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loginStatus, setLoginStatus] = useState<string | null>(null);
 
-  // Requests state
-  const [requests, setRequests] = useState<OfficeRequest[]>([]);
-  const [requestsLoading, setRequestsLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Members state
-  const [members, setMembers] = useState<GroupMember[]>([]);
-  const [memberLoading, setMemberLoading] = useState(false);
+  // Members hook
+  const { members, loading: memberLoading, fetchMembers } = useMembers();
   const [addUsername, setAddUsername] = useState("");
   const [adminMsg, setAdminMsg] = useState<string | null>(null);
 
-  // Admins state
-  const [admins, setAdmins] = useState<Admin[]>([]);
-  const [adminLoading, setAdminLoading] = useState(false);
+  // Admins hook
+  const { admins, loading: adminLoading, fetchAdmins } = useAdmins();
   const [addAdminUsername, setAddAdminUsername] = useState("");
   const [adminAdminMsg, setAdminAdminMsg] = useState<string | null>(null);
 
+  // Requests hook
+  const { requests, loading: requestsLoading, fetchRequests } = useRequests();
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // Fetch data on mount for everyone
   useEffect(() => {
-    // Fetch members
-    const loadMembers = async () => {
-      setMemberLoading(true);
-      try {
-        const membersData = await fetchMembers();
-        setMembers(membersData);
-      } catch {
-        setMembers([]);
-      }
-      setMemberLoading(false);
-    };
-    // Fetch requests
-    const loadRequests = async () => {
-      setRequestsLoading(true);
-      try {
-        const { data } = await fetchRequests();
-        setRequests(data);
-      } catch {
-        setRequests([]);
-      }
-      setRequestsLoading(false);
-    };
-    // Fetch admins
-    const loadAdmins = async () => {
-      setAdminLoading(true);
-      try {
-        const adminsData = await fetchAdmins();
-        setAdmins(adminsData);
-      } catch {
-        setAdmins([]);
-      }
-      setAdminLoading(false);
-    };
-    // Make these functions available to handlers
-    (window as any).loadMembers = loadMembers;
-    (window as any).loadRequests = loadRequests;
-    (window as any).loadAdmins = loadAdmins;
-    loadMembers();
-    loadRequests();
-    loadAdmins();
+    fetchMembers();
+    fetchRequests(1, 100); // or whatever default page/size you want
+    fetchAdmins();
+    // Optionally, expose fetchers for manual refresh
+    (window as unknown as { loadMembers: () => void; loadRequests: (page: number, pageSize: number) => void; loadAdmins: () => void }).loadMembers = fetchMembers;
+    (window as unknown as { loadMembers: () => void; loadRequests: (page: number, pageSize: number) => void; loadAdmins: () => void }).loadRequests = fetchRequests;
+    (window as unknown as { loadMembers: () => void; loadRequests: (page: number, pageSize: number) => void; loadAdmins: () => void }).loadAdmins = fetchAdmins;
   }, []);
 
   const handleLogin = async (key: string, pubKey: string) => {
@@ -116,7 +82,7 @@ export default function AdminPage() {
     setDeleteLoading(true);
     try {
       await supabase.from("office_requests").update({ deleted: true }).eq("id", id);
-      await (window as any).loadRequests();
+      await (window as unknown as { loadRequests: (page: number, pageSize: number) => void }).loadRequests(1, 100);
     } catch {}
     setDeleteLoading(false);
   };
@@ -128,7 +94,6 @@ export default function AdminPage() {
       setAdminMsg("Please enter a GitHub username.");
       return;
     }
-    setMemberLoading(true);
     try {
       const username = addUsername.trim();
       const avatar_url = `https://github.com/${username}.png`;
@@ -136,7 +101,6 @@ export default function AdminPage() {
       const keysData = await keysResp.json();
       if (!keysResp.ok) {
         setAdminMsg(keysData.error || "Failed to fetch keys for this user.");
-        setMemberLoading(false);
         return;
       }
       // Find the first 4096-bit ssh-rsa key
@@ -150,7 +114,6 @@ export default function AdminPage() {
       }
       if (!public_key) {
         setAdminMsg("No 4096-bit ssh-rsa public key found for this GitHub user. Please ask them to generate one and add it to their GitHub account.");
-        setMemberLoading(false);
         return;
       }
       const { error } = await supabase.from("group_members").insert({
@@ -163,24 +126,25 @@ export default function AdminPage() {
       } else {
         setAdminMsg("Member added successfully.");
         setAddUsername("");
-        await (window as any).loadMembers();
+        await (window as unknown as { loadMembers: () => void }).loadMembers();
       }
-    } catch (e: any) {
-      console.error(e);
-      setAdminMsg("Unexpected error adding member: " + (e?.message || JSON.stringify(e)));
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        console.error(e);
+        setAdminMsg("Unexpected error adding member: " + e.message);
+      } else {
+        setAdminMsg("Unexpected error adding member: " + JSON.stringify(e));
+      }
     }
-    setMemberLoading(false);
   };
 
   // Remove member
   const handleRemoveMember = async (id: string) => {
     setAdminMsg(null);
-    setMemberLoading(true);
     try {
       await supabase.from("group_members").delete().eq("id", id);
-      await (window as any).loadMembers();
+      await (window as unknown as { loadMembers: () => void }).loadMembers();
     } catch {}
-    setMemberLoading(false);
   };
 
   // Add admin
@@ -190,26 +154,22 @@ export default function AdminPage() {
       setAdminAdminMsg("Please enter a GitHub username.");
       return;
     }
-    setAdminLoading(true);
     try {
       const username = addAdminUsername.trim();
       const keysResp = await fetch(`/api/github-keys?username=${encodeURIComponent(username)}`);
       const keysData = await keysResp.json();
       if (!keysResp.ok) {
         setAdminAdminMsg(keysData.error || "Failed to fetch keys for this user.");
-        setAdminLoading(false);
         return;
       }
       const public_key = (keysData.keys || []).find((k: string) => k.startsWith("ssh-rsa ")) || "";
       if (!public_key) {
         setAdminAdminMsg("No ssh-rsa public key found for this GitHub user.");
-        setAdminLoading(false);
         return;
       }
       // Prevent duplicate
       if (admins.some((a) => a.public_key === public_key)) {
         setAdminAdminMsg("This user is already an admin.");
-        setAdminLoading(false);
         return;
       }
       const { error } = await supabase.from("admins").insert({
@@ -221,39 +181,39 @@ export default function AdminPage() {
       } else {
         setAdminAdminMsg("Admin added successfully.");
         setAddAdminUsername("");
-        await (window as any).loadAdmins();
+        await (window as unknown as { loadAdmins: () => void }).loadAdmins();
       }
-    } catch (e: any) {
-      console.error(e);
-      setAdminAdminMsg("Unexpected error adding admin: " + (e?.message || JSON.stringify(e)));
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        console.error(e);
+        setAdminAdminMsg("Unexpected error adding admin: " + e.message);
+      } else {
+        setAdminAdminMsg("Unexpected error adding admin: " + JSON.stringify(e));
+      }
     }
-    setAdminLoading(false);
   };
 
   // Remove admin
   const handleRemoveAdmin = async (id: string, public_key: string) => {
     setAdminAdminMsg(null);
-    setAdminLoading(true);
     try {
       if (public_key === userPubKey) {
         setAdminAdminMsg("You cannot remove yourself as admin.");
-        setAdminLoading(false);
         return;
       }
       await supabase.from("admins").delete().eq("id", id);
-      await (window as any).loadAdmins();
+      await (window as unknown as { loadAdmins: () => void }).loadAdmins();
       setAdminAdminMsg("Admin removed successfully.");
-    } catch (e) {
+    } catch {
       setAdminAdminMsg("Unexpected error removing admin.");
     }
-    setAdminLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-gray-200 font-sans flex flex-col items-center p-8">
       <header className="w-full flex items-center bg-[#1a237e] text-white px-4 py-2 border-b-4 border-gray-400 shadow-lg mb-8">
         <span className="font-bold text-xl mr-4">📝 Parc-It Admin Portal</span>
-        <a href="/" className="ml-auto underline text-xs text-white hover:text-blue-200">&larr; Back to Home</a>
+        <Link href="/" className="ml-auto underline text-xs text-white hover:text-blue-200">&larr; Back to Home</Link>
       </header>
       <div className="flex flex-col items-center mt-4 mb-8">
         <Button onClick={() => setLoginOpen(true)} className="mb-2">Login with Parc-It Key</Button>
@@ -391,4 +351,4 @@ export default function AdminPage() {
       />
     </div>
   );
-} 
+}

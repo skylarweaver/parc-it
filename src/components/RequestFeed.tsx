@@ -1,0 +1,157 @@
+import React from "react";
+import { OfficeRequest, GroupMember } from "../types/models";
+import { Button } from "./ui/button";
+
+interface RequestFeedProps {
+  requests: OfficeRequest[];
+  members: GroupMember[];
+  upvoteCounts: { [requestId: string]: number };
+  loggedIn: boolean;
+  upvoteLoading: string | null;
+  submitUpvote: (...args: unknown[]) => void;
+  handleOpenVerify: (req: OfficeRequest) => void;
+  currentPage: number;
+  pageSize: number;
+  totalRequests: number;
+  setCurrentPage: (page: number) => void;
+  fetchRequests: (page: number, pageSize: number) => void;
+}
+
+function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, submitUpvote, handleOpenVerify }: {
+  req: OfficeRequest;
+  members: GroupMember[];
+  loggedIn: boolean;
+  upvoteCounts: { [requestId: string]: number };
+  upvoteLoading: string | null;
+  submitUpvote: (...args: unknown[]) => void;
+  handleOpenVerify: (req: OfficeRequest) => void;
+}) {
+  const groupMemberObjs = Array.isArray(req.group_members)
+    ? members.filter((m: GroupMember) => req.group_members.includes(m.github_username))
+    : [];
+  const isDoxxed = !!req.doxxed_member_id;
+  return (
+    <li key={req.id} className="border-2 border-gray-400  p-4 bg-white shadow-sm relative">
+      <div className="flex items-center gap-4">
+        <span className="text-3xl w-10 text-center">{req.emoji}</span>
+        <span className="flex-1 flex items-center gap-2">
+          <span className="retro-text">{req.description}</span>
+          <span className="retro-label flex items-center gap-1">{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
+        </span>
+        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
+        {/* TEMPORARY: Hiding upvote button for demo. Restore after demo. */}
+        {false && (
+        <Button
+          variant="default"
+          size="sm"
+          className="ml-2"
+          onClick={() => submitUpvote(req)}
+          disabled={!loggedIn || upvoteLoading === req.id}
+        >
+          {upvoteLoading === req.id ? "Upvoting..." : "Upvote"}
+        </Button>
+        )}
+      </div>
+      {/* TEMPORARY: Hiding upvote count for demo. Restore after demo. */}
+      {false && (
+      <span className="absolute bottom-2 right-4 text-xs text-purple-800 font-mono bg-purple-100 px-2 py-1 rounded shadow border border-purple-300 retro-badge">
+        {upvoteCounts[req.id] || 0} upvotes
+      </span>
+      )}
+      <div className="flex items-center gap-2 mt-2 ml-14">
+        {groupMemberObjs.slice(0, 5).map((m: GroupMember, idx: number) => (
+          <img
+            key={m.id}
+            src={m.avatar_url}
+            alt={m.github_username}
+            title={m.github_username}
+            className="retro-avatar -ml-2 first:ml-0"
+            style={{ zIndex: 10 - idx }}
+          />
+        ))}
+        {groupMemberObjs.length > 5 && (
+          <span className="ml-1 px-2 py-0.5 bg-gray-200 text-xs rounded-full border border-gray-400 font-mono">+{groupMemberObjs.length - 5} more</span>
+        )}
+      </div>
+    </li>
+  );
+}
+
+export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests }: RequestFeedProps) {
+  return (
+    <div className="w-full max-w-xl mb-20">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold">Office Requests</h2>
+        {/* Add Request button is handled in parent */}
+      </div>
+      {requests.length === 0 ? (
+        <div className="text-gray-500">No requests yet.</div>
+      ) : (
+        <>
+          <ul className="space-y-4">
+            {requests.map((req) => (
+              <RequestCard
+                key={req.id}
+                req={req}
+                members={members}
+                loggedIn={loggedIn}
+                upvoteCounts={upvoteCounts}
+                upvoteLoading={upvoteLoading}
+                submitUpvote={submitUpvote}
+                handleOpenVerify={handleOpenVerify}
+              />
+            ))}
+          </ul>
+          {/* Pagination Controls */}
+          <div className="flex justify-center items-center mt-6 gap-2">
+            <button
+              className="retro-btn px-3 py-1"
+              onClick={() => {
+                if (currentPage > 1) {
+                  setCurrentPage(currentPage - 1);
+                  fetchRequests(currentPage - 1, pageSize);
+                }
+              }}
+              disabled={currentPage === 1}
+              style={{ minWidth: 40 }}
+            >
+              &#8592; Prev
+            </button>
+            {/* Page Numbers */}
+            {Array.from({ length: Math.ceil(totalRequests / pageSize) }, (_, i) => i + 1).map(pageNum => (
+              <button
+                key={pageNum}
+                className={`retro-btn px-3 py-1 ${pageNum === currentPage ? 'bg-blue-200 border-blue-700' : ''}`}
+                onClick={() => {
+                  setCurrentPage(pageNum);
+                  fetchRequests(pageNum, pageSize);
+                }}
+                disabled={pageNum === currentPage}
+                style={{ minWidth: 32 }}
+              >
+                {pageNum}
+              </button>
+            ))}
+            <button
+              className="retro-btn px-3 py-1"
+              onClick={() => {
+                const totalPages = Math.ceil(totalRequests / pageSize);
+                if (currentPage < totalPages) {
+                  setCurrentPage(currentPage + 1);
+                  fetchRequests(currentPage + 1, pageSize);
+                }
+              }}
+              disabled={currentPage === Math.ceil(totalRequests / pageSize) || totalRequests === 0}
+              style={{ minWidth: 40 }}
+            >
+              Next &#8594;
+            </button>
+            <span className="ml-4 text-xs text-gray-600 font-mono">
+              Page {currentPage} of {Math.max(1, Math.ceil(totalRequests / pageSize))}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+} 

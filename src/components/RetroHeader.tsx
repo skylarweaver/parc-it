@@ -2,7 +2,7 @@ import React from "react";
 
 interface RetroHeaderProps {
   loggedIn: boolean;
-  loading: boolean;
+  loading?: boolean;
   setLoginOpen: (open: boolean) => void;
   setLoggedIn: (loggedIn: boolean) => void;
   setUserPubKey: (pubKey: string | null) => void;
@@ -11,7 +11,7 @@ interface RetroHeaderProps {
 
 export default function RetroHeader({
   loggedIn,
-  loading,
+  loading = false,
   setLoginOpen,
   setLoggedIn,
   setUserPubKey,
