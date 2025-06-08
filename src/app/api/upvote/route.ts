@@ -1,3 +1,4 @@
+// TEMPORARILY DEPRECATED: This is the old upvote route using cryptographic nullifiers. Kept for reference only. Use /api/upvote-public for the new public key-based upvote flow.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifySignature } from '../../../helpers/plonky2/utils';
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
       nullifierHex = String(nullifier);
     }
     // 2. Check for duplicate upvote
-    const { data: existing, error: checkError } = await supabase
+    const { data: existing } = await supabase
       .from('request_upvotes')
       .select('id')
       .eq('request_id', requestId)
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
     return NextResponse.json({ success: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Unexpected error.' }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: (e as Error)?.message || 'Unexpected error.' }, { status: 500 });
   }
 } 

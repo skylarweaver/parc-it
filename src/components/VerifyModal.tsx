@@ -12,6 +12,7 @@ interface VerifyModalProps {
   loading: boolean;
   result: { valid: boolean; groupKeys?: string; error?: unknown; nullifier?: unknown } | null;
   onVerify: (message: string, signature: string) => void;
+  members: { github_username: string; avatar_url: string }[];
 }
 
 export function VerifyModal({
@@ -21,6 +22,7 @@ export function VerifyModal({
   loading,
   result,
   onVerify,
+  members,
 }: VerifyModalProps) {
   if (!isOpen || !request) return null;
   return (
@@ -38,25 +40,28 @@ export function VerifyModal({
           <span className="font-bold">Group Members:</span>
           <ul className="list-none ml-0 text-sm">
             {Array.isArray(request.group_members) && request.group_members.length > 0 ? (
-              request.group_members.map((username: string, idx: number) => (
-                <li key={idx} className="flex items-center gap-2 py-1">
-                  <img
-                    src={`https://github.com/${username}.png`}
-                    alt={username}
-                    className="retro-avatar"
-                  />
-                  <span className="font-mono">{username}</span>
-                  <a
-                    href={`https://github.com/${username}.keys`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2 py-0.5 bg-gray-200 rounded text-xs hover:bg-blue-100 ml-1 flex items-center gap-1"
-                  >
-                    Verify Key
-                    <svg xmlns="http://www.w3.org/2000/svg" width="1.25em" height="1.25em" viewBox="0 0 20 20" fill="none"><path d="M7 13L13 7M13 7H8M13 7V12" stroke="#1a237e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </a>
-                </li>
-              ))
+              request.group_members.map((username: string, idx: number) => {
+                const member = members.find(m => m.github_username === username);
+                return (
+                  <li key={idx} className="flex items-center gap-2 py-1">
+                    <img
+                      src={member ? member.avatar_url : `https://github.com/${username}.png`}
+                      alt={username}
+                      className="retro-avatar"
+                    />
+                    <span className="font-mono">{username}</span>
+                    <a
+                      href={`https://github.com/${username}.keys`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-0.5 bg-gray-200 rounded text-xs hover:bg-blue-100 ml-1 flex items-center gap-1"
+                    >
+                      Verify Key
+                      <svg xmlns="http://www.w3.org/2000/svg" width="1.25em" height="1.25em" viewBox="0 0 20 20" fill="none"><path d="M7 13L13 7M13 7H8M13 7V12" stroke="#1a237e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </a>
+                  </li>
+                );
+              })
             ) : (
               <li className="italic text-gray-500">No group members listed</li>
             )}

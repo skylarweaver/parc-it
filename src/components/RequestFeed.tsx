@@ -8,23 +8,45 @@ interface RequestFeedProps {
   upvoteCounts: { [requestId: string]: number };
   loggedIn: boolean;
   upvoteLoading: string | null;
-  submitUpvote: (...args: unknown[]) => void;
+  submitUpvote: (
+    req: OfficeRequest,
+    loggedIn: boolean,
+    parcItKey: string | null,
+    userPubKey: string | null,
+    members: GroupMember[],
+    fetchUpvoteCountsCallback: (ids: string[]) => void
+  ) => void;
   handleOpenVerify: (req: OfficeRequest) => void;
   currentPage: number;
   pageSize: number;
   totalRequests: number;
   setCurrentPage: (page: number) => void;
   fetchRequests: (page: number, pageSize: number) => void;
+  upvoteMsg: { [requestId: string]: string } | null;
+  parcItKey: string | null;
+  userPubKey: string | null;
+  fetchUpvoteCounts: (ids: string[]) => void;
 }
 
-function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, submitUpvote, handleOpenVerify }: {
+function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, submitUpvote, handleOpenVerify, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts }: {
   req: OfficeRequest;
   members: GroupMember[];
   loggedIn: boolean;
   upvoteCounts: { [requestId: string]: number };
   upvoteLoading: string | null;
-  submitUpvote: (...args: unknown[]) => void;
+  submitUpvote: (
+    req: OfficeRequest,
+    loggedIn: boolean,
+    parcItKey: string | null,
+    userPubKey: string | null,
+    members: GroupMember[],
+    fetchUpvoteCountsCallback: (ids: string[]) => void
+  ) => void;
   handleOpenVerify: (req: OfficeRequest) => void;
+  upvoteMsg: { [requestId: string]: string } | null;
+  parcItKey: string | null;
+  userPubKey: string | null;
+  fetchUpvoteCounts: (ids: string[]) => void;
 }) {
   const groupMemberObjs = Array.isArray(req.group_members)
     ? members.filter((m: GroupMember) => req.group_members.includes(m.github_username))
@@ -39,25 +61,25 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
           <span className="retro-label flex items-center gap-1">{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
         </span>
         <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
-        {/* TEMPORARY: Hiding upvote button for demo. Restore after demo. */}
-        {false && (
         <Button
           variant="default"
           size="sm"
-          className="ml-2"
-          onClick={() => submitUpvote(req)}
+          className="ml-2 retro-upvote-btn"
+          onClick={() => submitUpvote(req, loggedIn, parcItKey, userPubKey, members, fetchUpvoteCounts)}
           disabled={!loggedIn || upvoteLoading === req.id}
         >
-          {upvoteLoading === req.id ? "Upvoting..." : "Upvote"}
+          {upvoteLoading === req.id ? "Upvoting..." : "⬆ Upvote"}
         </Button>
+        <span className="retro-upvote-count ml-2 px-2 py-1 rounded shadow border border-purple-300 font-mono text-xs" style={{ color: '#7c3aed', background: '#f3e8ff' }}>
+          {upvoteCounts[req.id] || 0} upvotes
+        </span>
+        {/* Upvote message area (success/error) */}
+        {upvoteMsg && upvoteMsg[req.id] && (
+          <span className="block mt-1 text-xs font-mono" style={{ color: upvoteMsg[req.id].toLowerCase().includes('success') || upvoteMsg[req.id].toLowerCase().includes('submitted') ? '#059669' : '#b91c1c' }}>
+            {upvoteMsg[req.id]}
+          </span>
         )}
       </div>
-      {/* TEMPORARY: Hiding upvote count for demo. Restore after demo. */}
-      {false && (
-      <span className="absolute bottom-2 right-4 text-xs text-purple-800 font-mono bg-purple-100 px-2 py-1 rounded shadow border border-purple-300 retro-badge">
-        {upvoteCounts[req.id] || 0} upvotes
-      </span>
-      )}
       <div className="flex items-center gap-2 mt-2 ml-14">
         {groupMemberObjs.slice(0, 5).map((m: GroupMember, idx: number) => (
           <img
@@ -77,11 +99,10 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
   );
 }
 
-export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests }: RequestFeedProps) {
+export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts }: RequestFeedProps) {
   return (
     <div className="w-full max-w-xl mb-20">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">Office Requests</h2>
         {/* Add Request button is handled in parent */}
       </div>
       {requests.length === 0 ? (
@@ -99,6 +120,10 @@ export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteL
                 upvoteLoading={upvoteLoading}
                 submitUpvote={submitUpvote}
                 handleOpenVerify={handleOpenVerify}
+                upvoteMsg={upvoteMsg}
+                parcItKey={parcItKey}
+                userPubKey={userPubKey}
+                fetchUpvoteCounts={fetchUpvoteCounts}
               />
             ))}
           </ul>

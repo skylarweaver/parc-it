@@ -1,5 +1,4 @@
 "use client";
-import { Button } from "../components/ui/button";
 import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -45,7 +44,7 @@ export default function Home() {
   const { members, fetchMembers } = useMembers();
   const { admins, fetchAdmins } = useAdmins();
   const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest } = useRequests();
-  const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote } = useUpvotes();
+  const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, upvoteMsg } = useUpvotes();
   const { verifyResult, verifyLoading, verifyRequestSignature, setVerifyResult } = useRequestVerification();
 
   const handleLogin = async (key: string, pubKey: string) => {
@@ -253,6 +252,10 @@ export default function Home() {
                 totalRequests={totalRequests}
                 setCurrentPage={setCurrentPage}
                 fetchRequests={fetchRequests}
+                upvoteMsg={upvoteMsg}
+                parcItKey={parcItKey}
+                userPubKey={userPubKey}
+                fetchUpvoteCounts={fetchUpvoteCounts}
               />
             )}
           </div>
@@ -287,6 +290,7 @@ export default function Home() {
         loading={verifyLoading}
         result={verifyResult}
         onVerify={verifyRequestSignature}
+        members={members}
       />
       <KeyModal
         isOpen={keyModalOpen}

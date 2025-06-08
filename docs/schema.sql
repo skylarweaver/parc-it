@@ -39,8 +39,8 @@ CREATE INDEX office_requests_deleted_idx ON office_requests (deleted);
 -- Table: request_upvotes (for anonymous upvoting with nullifiers)
 CREATE TABLE request_upvotes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  request_id uuid NOT NULL REFERENCES office_requests(id),
-  nullifier text NOT NULL,
+  request_id uuid NOT NULL REFERENCES office_requests(id) ON DELETE CASCADE,
+  nullifier text NOT NULL, -- for now this will just be the public key (not anonymous upvoting)
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (request_id, nullifier)
 );

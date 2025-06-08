@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { OfficeRequest, GroupMember } from '../../types/models';
-import { generateSignatureWithNullifier, to32ByteNonce } from '../plonky2/utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -58,41 +57,35 @@ export function useUpvotes() {
       members: GroupMember[],
       fetchUpvoteCountsCallback: (ids: string[]) => void
     ) => {
-      if (!loggedIn || !parcItKey || !userPubKey) {
+      console.log('submitUpvote called', { req, loggedIn, parcItKey, userPubKey });
+      if (!loggedIn || !userPubKey) {
         setUpvoteMsg((prev) => ({ ...prev, [req.id]: 'You must be logged in to upvote.' }));
         return;
       }
       setUpvoteLoading(req.id);
       setUpvoteMsg((prev) => ({ ...prev, [req.id]: '' }));
       try {
-        const groupKeys = Array.isArray(req.group_members)
-          ? members.filter((m) => req.group_members.includes(m.github_username)).map((m) => m.public_key).join('\n')
-          : '';
-        if (!groupKeys) {
-          setUpvoteMsg((prev) => ({ ...prev, [req.id]: 'No group keys found for this request.' }));
-          setUpvoteLoading(null);
-          return;
-        }
-        const message = `${req.emoji} ${req.description}`;
-        const nonce = await to32ByteNonce(req.id);
-        const signature = await generateSignatureWithNullifier(message, groupKeys, parcItKey, nonce);
-        const upvoteFunctionUrl = process.env.NEXT_PUBLIC_UPVOTE_FUNCTION_URL!;
-        const res = await fetch(upvoteFunctionUrl, {
+        const payload = { requestId: req.id, publicKey: userPubKey };
+        console.log('Upvote API payload:', payload);
+        const res = await fetch('/api/upvote-public', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`
           },
-          body: JSON.stringify({ requestId: req.id, signature, message })
+          body: JSON.stringify(payload)
         });
         const result = await res.json();
+        console.log('Upvote API response:', res.status, result);
         if (res.ok && result.success) {
           setUpvoteMsg((prev) => ({ ...prev, [req.id]: 'Upvote submitted!' }));
           fetchUpvoteCountsCallback([req.id]);
+        } else if (res.status === 409) {
+          setUpvoteMsg((prev) => ({ ...prev, [req.id]: result.error || 'You have already upvoted this request.' }));
         } else {
           setUpvoteMsg((prev) => ({ ...prev, [req.id]: result.error || 'Error submitting upvote.' }));
         }
       } catch (e: unknown) {
+        console.error('Upvote API error:', e);
         if (e instanceof Error) {
           setUpvoteMsg((prev) => ({ ...prev, [req.id]: e.message || 'Error submitting upvote.' }));
         } else {
