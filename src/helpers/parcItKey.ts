@@ -1,4 +1,4 @@
-// parcItKey.ts - Helper functions for parc-it key derivation and validation
+// parcItKey.ts - Helper functions for Double Blind Key derivation and validation
 // Ported from double-blind/src/helpers/sshFormat.ts, binaryFormat.ts, rsa.ts
 
 // --- Utility functions ---

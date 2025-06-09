@@ -43,14 +43,14 @@ export default function Home() {
   const [pageSize] = React.useState(10);
   const { members, fetchMembers } = useMembers();
   const { admins, fetchAdmins } = useAdmins();
-  const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest } = useRequests();
+  const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading } = useRequests();
   const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, upvoteMsg, upvotersByRequest } = useUpvotes();
   const { verifyResult, verifyLoading, verifyRequestSignature, setVerifyResult } = useRequestVerification();
 
   const handleLogin = async (key: string, pubKey: string) => {
     setIsAdmin(false);
     try {
-      // Only local validation: check if we can derive a valid SSH key from the Parc-It Key
+      // Only local validation: check if we can derive a valid SSH key from the Double Blind Key
       if (!pubKey || pubKey.startsWith("ERROR")) {
         setLoggedIn(false);
         setUserPubKey(null);
@@ -94,9 +94,8 @@ export default function Home() {
       setSelectedGroup(members.map((m) => m.github_username));
     }
     // Reset request modal state (message, loading) whenever modal is opened or closed
-    // setRequestMsg(null);
-    // setRequestLoading(false);
-    // Instead, rely on useRequests hook's state reset on modal open/close
+    setRequestMsg(null);
+    setRequestLoading(false);
   }, [addRequestOpen]);
 
   // Add this useEffect after the isDoxxed state declaration:
@@ -105,6 +104,24 @@ export default function Home() {
       setIsDoxxed(true); // Doxxed is default
     }
   }, [addRequestOpen]);
+
+  // Reset all AddRequestModal state fields when modal is opened
+  useEffect(() => {
+    if (addRequestOpen) {
+      setRequestEmoji("");
+      setRequestDesc("");
+      setIsDoxxed(true);
+      setShowEmojiPicker(false);
+      if (members.length > 0) {
+        setSelectedGroup(members.map((m) => m.github_username));
+      } else {
+        setSelectedGroup([]);
+      }
+      // Reset request modal state
+      setRequestMsg(null);
+      setRequestLoading(false);
+    }
+  }, [addRequestOpen, members]);
 
   // Open verify modal for a request
   const handleOpenVerify = async (req: OfficeRequest) => {
@@ -156,7 +173,7 @@ export default function Home() {
   };
 
   React.useEffect(() => {
-    // Auto-login if Parc-It key is in localStorage
+    // Auto-login if Double Blind Key is in localStorage
     const storedKey = localStorage.getItem("parcItKey");
     const storedPubKey = localStorage.getItem("parcItPubKey");
     if (storedKey && storedPubKey) {

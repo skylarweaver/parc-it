@@ -30,7 +30,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
       const groupKeysArray = groupPublicKeys.split('\n');
       console.log({ groupPublicKeys, groupKeysArray, idx, result });
       if (idx === undefined || idx < 0 || idx >= groupKeysArray.length) {
-        setError("Your Parc-It key is recognized, but the associated public key could not be found in the group. Message an admin to add you to the group.");
+        setError("Your Double Blind Key is recognized, but the associated public key could not be found in the group. Message an admin to add you to the group.");
         return;
       }
       const userPubKey = groupKeysArray[idx];
@@ -44,13 +44,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="retro-modal w-full max-w-md relative">
         <div className="retro-modal-header">
-          <span>Login with Parc-It Key</span>
+          <span>Login with Double Blind Key</span>
           <button className="absolute top-2 right-3 text-xl" onClick={onClose} style={{ color: '#fff', background: 'none', border: 'none', fontWeight: 'bold', fontSize: 22, cursor: 'pointer', right: 12, top: 8 }}>&times;</button>
         </div>
         <div className="mb-4 text-sm text-gray-700">
           <p className="mb-2">
-            <strong>How to get your Parc-It Key:</strong><br />
-            You need to generate a special SSH signature using your SSH private key. Your SSH private key never leaves your machine. Your SSH public key is stored client-side only.
+            <strong>How to get your Double Blind Key:</strong><br />
+            You need to generate a special SSH signature using your SSH private key. Your SSH private key never leaves your machine.
           </p>
           <ol className="list-decimal list-inside mb-2">
             <li>Make sure you have a <strong>4096-bit RSA SSH keypair</strong> (e.g. <code>~/.ssh/id_rsa</code>). If you don&apos;t, generate one with:<br />
@@ -80,7 +80,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               </ol>
               <span className="text-xs">This allows Parc-It to fetch your public key and include you as a 0xPARC member.</span>
             </li>
-            <li className="mt-2"><b>Generate your Parc-It Key </b>(SSH signature) with:<br />
+            <li className="mt-2"><b>Generate your Double Blind Key </b>(SSH signature) with:<br />
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <pre className="bg-gray-300 rounded p-2 mt-1 text-xs overflow-x-auto" style={{ flex: 1 }}>echo "E PLURIBUS UNUM; DO NOT SHARE" | ssh-keygen -Y sign -n double-blind.xyz -f ~/.ssh/id_rsa</pre>
                 <Button
@@ -110,7 +110,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         </div>
         <textarea
           className="w-full border rounded p-2 mb-2 min-h-[100px] bg-white"
-          placeholder="Paste your Parc-It key (SSH signature) here"
+          placeholder="Paste your Double Blind Key (SSH signature) here"
           value={key}
           onChange={e => setKey(e.target.value)}
           style={{ backgroundColor: 'white' }}

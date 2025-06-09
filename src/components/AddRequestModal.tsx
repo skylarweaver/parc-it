@@ -122,7 +122,7 @@ export function AddRequestModal({
           </div>
         </div>
         <div className="mb-4">
-          <label className="block mb-1 font-semibold">Description</label>
+          <label className="block mb-1 font-semibold">Request Description</label>
           <textarea
             className="border rounded p-2 w-full min-h-[80px]"
             placeholder="Describe your request..."

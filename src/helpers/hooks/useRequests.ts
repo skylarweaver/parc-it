@@ -160,5 +160,5 @@ export function useRequests() {
     []
   );
 
-  return { requests, loading, error, totalRequests, fetchRequests, setRequests, requestMsg, requestLoading, submitRequest };
+  return { requests, loading, error, totalRequests, fetchRequests, setRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading };
 } 

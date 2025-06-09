@@ -216,7 +216,7 @@ export default function AdminPage() {
         <Link href="/" className="ml-auto underline text-xs text-white hover:text-blue-200">&larr; Back to Home</Link>
       </header>
       <div className="flex flex-col items-center mt-4 mb-8">
-        <Button onClick={() => setLoginOpen(true)} className="mb-2">Login with Parc-It Key</Button>
+        <Button onClick={() => setLoginOpen(true)} className="mb-2">Login with Double Blind Key</Button>
         {loginStatus && <div className="text-red-600 mb-2">{loginStatus}</div>}
       </div>
       <div className="w-full max-w-3xl flex flex-col gap-8">

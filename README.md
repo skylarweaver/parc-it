@@ -20,7 +20,7 @@ Parc-It! is an anonymous office request board for the 0xPARC office. The goal is
 ## User Flows
 
 - **Public:** View requests, group members, and technical details. Cannot submit or upvote.
-- **Login:** Paste "parc-it key" to derive public key and check membership.
+- **Login:** Paste "Double Blind Key" to derive public key and check membership.
 - **Authenticated:** Submit requests, upvote, view all features.
 - **Admin:** Manage group members, delete requests, see admin-only UI.
 
@@ -161,7 +161,7 @@ Original repo: https://github.com/dgulotta/double-blind
 
 - Use docs folder for documentation.
 - Desktop-first, always-on retro theme.
-- No OAuth or passwords; login via parc-it key only.
+- No OAuth or passwords; login via Double Blind Key only.
 - Admins identified by hardcoded SSH pub keys.
 - Fetch only first RSA key from GitHub .keys every 10 minutes.
 - Avoid large fields in list queries; fetch only what is needed.

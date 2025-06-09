@@ -60,7 +60,7 @@ export default function RetroHeader({
             disabled={loading}
             style={{ minWidth: 160, marginLeft: 12 }}
           >
-            {loading ? "Logging in..." : "Login with Parc-It Key"}
+            {loading ? "Logging in..." : "Login with Double Blind Key"}
           </button>
         ) : (
           <>

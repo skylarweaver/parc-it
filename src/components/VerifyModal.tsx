@@ -10,7 +10,7 @@ interface VerifyModalProps {
   onClose: () => void;
   request: OfficeRequest | null;
   loading: boolean;
-  result: { valid: boolean; groupKeys?: string; error?: unknown; nullifier?: unknown } | null;
+  result: { valid: boolean; groupKeys?: string; error?: unknown; nullifier?: string | undefined } | null;
   onVerify: (message: string, signature: string) => void;
   members: { github_username: string; avatar_url: string }[];
 }
@@ -119,27 +119,26 @@ export function VerifyModal({
             {result && (
               <div className={`mb-4 ${result.valid ? 'text-green-700 bg-green-50 border border-green-200 rounded' : ''}`}>
                 <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto">
-{result.valid
-  ? `Proof Generated ✅\nSignature is valid!\nGroup keys: (which you can manually compare above)\n${result.groupKeys}`
-  : String((() => {
-      let errorMsg = 'Unknown error';
-      if (result.error) {
-        if (typeof result.error === 'string') {
-          errorMsg = result.error;
-        } else if (typeof result.error === 'object' && 'message' in result.error && result.error.message) {
-          errorMsg = String(result.error.message);
-        } else {
-          errorMsg = JSON.stringify(result.error);
-        }
-      }
-      return `Invalid signature: ${errorMsg}`;
-    })())}
+                  {result.valid
+                    ? `Proof Generated ✅\nSignature is valid!\nGroup keys: (which you can manually compare above)\n${result.groupKeys}`
+                    : String((() => {
+                        let errorMsg = 'Unknown error';
+                        if (result.error) {
+                          if (typeof result.error === 'string') {
+                            errorMsg = result.error;
+                          } else if (typeof result.error === 'object' && 'message' in result.error && result.error.message) {
+                            errorMsg = String(result.error.message);
+                          } else {
+                            errorMsg = JSON.stringify(result.error);
+                          }
+                        }
+                        return `Invalid signature: ${errorMsg}`;
+                      })())}
                 </pre>
                 {/* Nullifier display: only for upvotes (not regular group signatures) */}
                 {result.valid && 'nullifier' in result && result.nullifier && (
                   <div className="mt-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded p-2">
-                    <span className="font-bold">Nullifier:</span> {Array.isArray(result.nullifier) ?
-                      Buffer.from(result.nullifier).toString('hex') : String(result.nullifier)}
+                    <span className="font-bold">Nullifier:</span> {result.nullifier ?? '[No nullifier]'}
                     <br />
                     <span className="text-gray-500">(Nullifiers are only present for upvotes or actions requiring uniqueness. Regular group signatures do not include a nullifier.)</span>
                   </div>
