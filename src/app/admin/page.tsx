@@ -227,7 +227,7 @@ export default function AdminPage() {
         )}
         <div className="bg-white border-2 border-gray-400 rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold">Office Requests</h2>
+            <h2 className="text-2xl font-bold">Office Ideas</h2>
           </div>
           {requestsLoading ? (
             <div>Loading requests...</div>

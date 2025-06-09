@@ -57,7 +57,7 @@ export function AddRequestModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
       <div className="bg-white  shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
-        <h2 className="text-xl font-bold mb-4">New Office Request</h2>
+        <h2 className="text-xl font-bold mb-4">New Office Idea</h2>
         {/* Toggle for Anonymous/Doxxed */}
         <div className="mb-4">
           <div className="flex items-center gap-4">
@@ -81,7 +81,7 @@ export function AddRequestModal({
             <span className={`text-base font-semibold transition-colors duration-200 ${!isDoxxed ? 'text-[#1a237e]' : 'text-gray-500'}`}>Anonymous</span>
           </div>
           <div className="mt-1">
-            <span className="text-xs text-gray-500">{isDoxxed ? "Your username will be shown with this request." : "Your request will be anonymous among the group you select below."}</span>
+            <span className="text-xs text-gray-500">{isDoxxed ? "Your username will be shown with this request." : "Your idea will be anonymous among the group you select below."}</span>
           </div>
         </div>
         {/* If doxxed, show preview of user info */}
@@ -126,10 +126,10 @@ export function AddRequestModal({
           </div>
         </div>
         <div className="mb-4">
-          <label className="block mb-1 font-semibold">Request Description</label>
+          <label className="block mb-1 font-semibold">Idea Description</label>
           <textarea
             className="border rounded p-2 w-full min-h-[80px]"
-            placeholder="Describe your request..."
+            placeholder="Describe your idea..."
             value={requestDesc}
             onChange={e => setRequestDesc(e.target.value)}
             disabled={requestLoading}
@@ -170,7 +170,7 @@ export function AddRequestModal({
         </div>
         {requestMsg && (
           <div className={`mb-2 text-sm font-semibold ${requestSuccess ? 'text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1' : 'text-red-600'}`}>{
-            requestSuccess ? 'Your request has been submitted.' : requestMsg
+            requestSuccess ? 'Your idea has been submitted.' : requestMsg
           }</div>
         )}
         {/* Progress bar for signature generation */}

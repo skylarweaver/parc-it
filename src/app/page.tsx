@@ -234,21 +234,21 @@ export default function Home() {
           <section className="w-full max-w-2xl mt-8 mb-8 bg-white border-2 border-gray-400  shadow p-6">
             <h1 className="retro-title mb-2 flex items-center gap-2">📝 Parc-It <span className="text-purple-500">✦</span></h1>
             <p className="retro-subtitle mb-2 text-lg">Every office suggestion here was posted by a member of 0xPARC—but we don't know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
-            <p className="text-sm text-gray-700">Submit requests for the office anonymously. Only group members can post, but no one (not even admins) can see who posted what.</p>
+            <p className="text-sm text-gray-700">Submit your ideas to improve the new office. Only group members can post. If posted in anonymous mode, no one (not even admins) can see who posted the idea.</p>
             <span className="blinking">✨ Verified by ZK Proofs ✨</span>
           </section>
           {/* Request Feed */}
           <div className="w-full max-w-xl mb-20">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Office Requests</h2>
+              <h2 className="text-lg font-bold">Office Ideas</h2>
               <button
                 className="ml-4 px-4 py-2 bg-[#1a237e] hover:bg-blue-800 text-white font-bold rounded border-2 border-gray-400 shadow"
                 onClick={() => loggedIn && setAddRequestOpen(true)}
                 disabled={!loggedIn}
-                title={loggedIn ? "Submit a new office request" : "Log in to submit a request"}
+                title={loggedIn ? "Submit a new office idea" : "Log in to submit a request"}
                 style={{ minWidth: 120, filter: !loggedIn ? 'grayscale(80%) opacity(0.5)' : 'none', cursor: !loggedIn ? 'not-allowed' : 'pointer' }}
               >
-                + Add Request
+                + Add Idea
               </button>
             </div>
             {requestsLoading ? (

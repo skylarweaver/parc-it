@@ -149,7 +149,7 @@ export function useRequests() {
         });
         const data = await res.json();
         if (!res.ok || !data.success) {
-          setRequestMsg(data.error || 'Failed to submit request.');
+          setRequestMsg(data.error || 'Failed to submit idea.');
         } else {
           setRequestMsg('Your proof has been generated and was submitted successfully.');
           setRequestSuccess(true);
