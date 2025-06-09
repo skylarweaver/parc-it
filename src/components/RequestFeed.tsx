@@ -14,7 +14,17 @@ interface RequestFeedProps {
     parcItKey: string | null,
     userPubKey: string | null,
     members: GroupMember[],
-    fetchUpvoteCountsCallback: (ids: string[]) => void
+    fetchUpvoteCountsCallback: (ids: string[]) => void,
+    allRequestIds: string[]
+  ) => void;
+  unUpvote: (
+    req: OfficeRequest,
+    loggedIn: boolean,
+    parcItKey: string | null,
+    userPubKey: string | null,
+    members: GroupMember[],
+    fetchUpvoteCountsCallback: (ids: string[]) => void,
+    allRequestIds: string[]
   ) => void;
   handleOpenVerify: (req: OfficeRequest) => void;
   currentPage: number;
@@ -29,7 +39,7 @@ interface RequestFeedProps {
   upvotersByRequest: { [requestId: string]: string[] };
 }
 
-function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, submitUpvote, handleOpenVerify, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest }: {
+function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, submitUpvote, unUpvote, handleOpenVerify, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest, allRequestIds }: {
   req: OfficeRequest;
   members: GroupMember[];
   loggedIn: boolean;
@@ -41,7 +51,17 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
     parcItKey: string | null,
     userPubKey: string | null,
     members: GroupMember[],
-    fetchUpvoteCountsCallback: (ids: string[]) => void
+    fetchUpvoteCountsCallback: (ids: string[]) => void,
+    allRequestIds: string[]
+  ) => void;
+  unUpvote: (
+    req: OfficeRequest,
+    loggedIn: boolean,
+    parcItKey: string | null,
+    userPubKey: string | null,
+    members: GroupMember[],
+    fetchUpvoteCountsCallback: (ids: string[]) => void,
+    allRequestIds: string[]
   ) => void;
   handleOpenVerify: (req: OfficeRequest) => void;
   upvoteMsg: { [requestId: string]: string } | null;
@@ -49,12 +69,14 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
   userPubKey: string | null;
   fetchUpvoteCounts: (ids: string[]) => void;
   upvotersByRequest: { [requestId: string]: string[] };
+  allRequestIds: string[];
 }) {
   const upvoterPubKeys = upvotersByRequest[req.id] || [];
   const upvoterMembers = upvoterPubKeys
     .map(pk => members.find(m => m.public_key === pk))
     .filter(Boolean) as GroupMember[];
   const isDoxxed = !!req.doxxed_member_id;
+  const hasUpvoted = !!userPubKey && upvoterPubKeys.includes(userPubKey);
   return (
     <li key={req.id} className="border-2 border-gray-400  p-4 bg-white shadow-sm relative">
       <div className="flex items-center gap-4">
@@ -67,10 +89,15 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
           variant="default"
           size="sm"
           className="ml-2 retro-upvote-btn"
-          onClick={() => submitUpvote(req, loggedIn, parcItKey, userPubKey, members, fetchUpvoteCounts)}
+          onClick={() => hasUpvoted
+            ? unUpvote(req, loggedIn, parcItKey, userPubKey, members, fetchUpvoteCounts, allRequestIds)
+            : submitUpvote(req, loggedIn, parcItKey, userPubKey, members, fetchUpvoteCounts, allRequestIds)
+          }
           disabled={!loggedIn || upvoteLoading === req.id}
         >
-          {upvoteLoading === req.id ? "Upvoting..." : "⬆ Upvote"}
+          {upvoteLoading === req.id
+            ? (hasUpvoted ? "Un-upvoting..." : "Upvoting...")
+            : (hasUpvoted ? "⬇ Un-upvote" : "⬆ Upvote")}
         </Button>
         {/* Upvote message area (success/error) */}
       </div>
@@ -104,7 +131,8 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
   );
 }
 
-export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest }: RequestFeedProps) {
+export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, unUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest }: RequestFeedProps) {
+  const allRequestIds = requests.map(r => r.id);
   return (
     <div className="w-full max-w-xl mb-20">
       <div className="flex items-center justify-between mb-4">
@@ -124,12 +152,14 @@ export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteL
                 upvoteCounts={upvoteCounts}
                 upvoteLoading={upvoteLoading}
                 submitUpvote={submitUpvote}
+                unUpvote={unUpvote}
                 handleOpenVerify={handleOpenVerify}
                 upvoteMsg={upvoteMsg}
                 parcItKey={parcItKey}
                 userPubKey={userPubKey}
                 fetchUpvoteCounts={fetchUpvoteCounts}
                 upvotersByRequest={upvotersByRequest}
+                allRequestIds={allRequestIds}
               />
             ))}
           </ul>

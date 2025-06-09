@@ -33,4 +33,24 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     return NextResponse.json({ error: (e as Error)?.message || 'Unexpected error.' }, { status: 500 });
   }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { requestId, publicKey } = await req.json();
+    if (!requestId || !publicKey) {
+      return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    }
+    const { error: deleteError } = await supabase
+      .from('request_upvotes')
+      .delete()
+      .eq('request_id', requestId)
+      .eq('nullifier', publicKey);
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: (e as Error)?.message || 'Unexpected error.' }, { status: 500 });
+  }
 } 

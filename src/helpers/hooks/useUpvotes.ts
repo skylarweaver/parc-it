@@ -63,7 +63,8 @@ export function useUpvotes() {
       parcItKey: string | null,
       userPubKey: string | null,
       members: GroupMember[],
-      fetchUpvoteCountsCallback: (ids: string[]) => void
+      fetchUpvoteCountsCallback: (ids: string[]) => void,
+      allRequestIds: string[]
     ) => {
       console.log('submitUpvote called', { req, loggedIn, parcItKey, userPubKey });
       if (!loggedIn || !userPubKey) {
@@ -85,8 +86,8 @@ export function useUpvotes() {
         const result = await res.json();
         console.log('Upvote API response:', res.status, result);
         if (res.ok && result.success) {
-          setUpvoteMsg((prev) => ({ ...prev, [req.id]: 'Upvote submitted!' }));
-          fetchUpvoteCountsCallback([req.id]);
+          setUpvoteMsg((prev) => ({ ...prev, [req.id]: 'Upvote submitted! Note: upvotes are public.' }));
+          fetchUpvoteCountsCallback(allRequestIds);
         } else if (res.status === 409) {
           setUpvoteMsg((prev) => ({ ...prev, [req.id]: result.error || 'You have already upvoted this request.' }));
         } else {
@@ -105,5 +106,45 @@ export function useUpvotes() {
     []
   );
 
-  return { upvoteCounts, loading, error, fetchUpvoteCounts, setUpvoteCounts, upvoteMsg, upvoteLoading, submitUpvote, upvotersByRequest };
+  const unUpvote = useCallback(
+    async (
+      req: OfficeRequest,
+      loggedIn: boolean,
+      parcItKey: string | null,
+      userPubKey: string | null,
+      members: GroupMember[],
+      fetchUpvoteCountsCallback: (ids: string[]) => void,
+      allRequestIds: string[]
+    ) => {
+      if (!loggedIn || !userPubKey) {
+        setUpvoteMsg((prev) => ({ ...prev, [req.id]: 'You must be logged in to un-upvote.' }));
+        return;
+      }
+      setUpvoteLoading(req.id);
+      setUpvoteMsg((prev) => ({ ...prev, [req.id]: '' }));
+      try {
+        const payload = { requestId: req.id, publicKey: userPubKey };
+        const res = await fetch('/api/upvote-public', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (res.ok && result.success) {
+          setUpvoteMsg((prev) => ({ ...prev, [req.id]: 'Upvote removed.' }));
+          fetchUpvoteCountsCallback(allRequestIds);
+        } else {
+          setUpvoteMsg((prev) => ({ ...prev, [req.id]: result.error || 'Error removing upvote.' }));
+        }
+      } catch {
+        setUpvoteMsg((prev) => ({ ...prev, [req.id]: 'Error removing upvote.' }));
+      }
+      setUpvoteLoading(null);
+    },
+    []
+  );
+
+  return { upvoteCounts, loading, error, fetchUpvoteCounts, setUpvoteCounts, upvoteMsg, upvoteLoading, submitUpvote, unUpvote, upvotersByRequest };
 } 

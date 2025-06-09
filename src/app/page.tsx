@@ -44,7 +44,7 @@ export default function Home() {
   const { members, fetchMembers } = useMembers();
   const { admins, fetchAdmins } = useAdmins();
   const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading, requestSuccess, setRequestSuccess } = useRequests();
-  const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, upvoteMsg, upvotersByRequest } = useUpvotes();
+  const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, unUpvote, upvoteMsg, upvotersByRequest } = useUpvotes();
   const { verifyResult, verifyLoading, verifyRequestSignature, setVerifyResult } = useRequestVerification();
 
   const handleLogin = async (key: string, pubKey: string) => {
@@ -263,6 +263,7 @@ export default function Home() {
                 loggedIn={loggedIn}
                 upvoteLoading={upvoteLoading}
                 submitUpvote={submitUpvote}
+                unUpvote={unUpvote}
                 handleOpenVerify={handleOpenVerify}
                 currentPage={currentPage}
                 pageSize={pageSize}
