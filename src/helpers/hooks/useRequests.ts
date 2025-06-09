@@ -151,7 +151,8 @@ export function useRequests() {
         if (!res.ok || !data.success) {
           setRequestMsg(data.error || 'Failed to submit request.');
         } else {
-          setRequestMsg('Your proof has been generated and is ready to use.');
+          setRequestMsg('Your proof has been generated and was submitted successfully.');
+          setRequestSuccess(true);
           fetchRequestsCallback(currentPage, pageSize);
         }
       } catch {

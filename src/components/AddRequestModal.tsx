@@ -170,7 +170,7 @@ export function AddRequestModal({
         </div>
         {requestMsg && (
           <div className={`mb-2 text-sm font-semibold ${requestSuccess ? 'text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1' : 'text-red-600'}`}>{
-            requestMsg
+            requestSuccess ? 'Your request has been submitted.' : requestMsg
           }</div>
         )}
         {/* Progress bar for signature generation */}
@@ -179,7 +179,7 @@ export function AddRequestModal({
         {requestLoading && <ProofTimer loading={requestLoading} />}
         <div className="flex gap-2 justify-end mt-4">
           <Button variant="outline" onClick={() => { setRequestSuccess(false); onClose(); }} disabled={requestLoading}>
-            {requestSuccess ? 'Close' : 'Cancel'}
+            Close
           </Button>
           {requestSuccess ? null : (
             <Button variant="default" onClick={submitRequest} disabled={requestLoading}>
