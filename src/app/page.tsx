@@ -43,7 +43,7 @@ export default function Home() {
   const [pageSize] = React.useState(10);
   const { members, fetchMembers } = useMembers();
   const { admins, fetchAdmins } = useAdmins();
-  const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading } = useRequests();
+  const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading, requestSuccess, setRequestSuccess } = useRequests();
   const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, upvoteMsg, upvotersByRequest } = useUpvotes();
   const { verifyResult, verifyLoading, verifyRequestSignature, setVerifyResult } = useRequestVerification();
 
@@ -300,6 +300,8 @@ export default function Home() {
         showEmojiPicker={showEmojiPicker}
         setShowEmojiPicker={setShowEmojiPicker}
         emojiPickerRef={emojiPickerRef as React.RefObject<HTMLDivElement>}
+        requestSuccess={requestSuccess}
+        setRequestSuccess={setRequestSuccess}
       />
       <VerifyModal
         isOpen={verifyModalOpen}

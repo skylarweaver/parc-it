@@ -26,6 +26,8 @@ interface AddRequestModalProps {
   showEmojiPicker: boolean;
   setShowEmojiPicker: (show: boolean) => void;
   emojiPickerRef: RefObject<HTMLDivElement>;
+  requestSuccess: boolean;
+  setRequestSuccess: (success: boolean) => void;
 }
 
 export function AddRequestModal({
@@ -48,6 +50,8 @@ export function AddRequestModal({
   showEmojiPicker,
   setShowEmojiPicker,
   emojiPickerRef,
+  requestSuccess,
+  setRequestSuccess,
 }: AddRequestModalProps) {
   if (!isOpen) return null;
   return (
@@ -165,10 +169,8 @@ export function AddRequestModal({
           <div className="text-xs text-gray-500 mt-1">{isDoxxed ? "Only you will be included in the group signature. To select other members, switch the toggle to anonymous." : "Only the selected members will be included in the group signature proof."}</div>
         </div>
         {requestMsg && (
-          <div className={`mb-2 text-sm font-semibold ${requestMsg.includes('proof has been generated') ? 'text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1' : requestMsg.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>{
-            requestMsg.includes('proof has been generated')
-              ? 'Your signature proof has been generated successfully. Your request has been submitted.'
-              : requestMsg
+          <div className={`mb-2 text-sm font-semibold ${requestSuccess ? 'text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1' : 'text-red-600'}`}>{
+            requestMsg
           }</div>
         )}
         {/* Progress bar for signature generation */}
@@ -176,10 +178,10 @@ export function AddRequestModal({
         {requestLoading && <ProgressBar />}
         {requestLoading && <ProofTimer loading={requestLoading} />}
         <div className="flex gap-2 justify-end mt-4">
-          <Button variant="outline" onClick={onClose} disabled={requestLoading}>
-            {requestMsg && requestMsg.includes('proof has been generated') ? 'Close' : 'Cancel'}
+          <Button variant="outline" onClick={() => { setRequestSuccess(false); onClose(); }} disabled={requestLoading}>
+            {requestSuccess ? 'Close' : 'Cancel'}
           </Button>
-          {requestMsg && requestMsg.includes('proof has been generated') ? null : (
+          {requestSuccess ? null : (
             <Button variant="default" onClick={submitRequest} disabled={requestLoading}>
               {requestLoading ? "Generating Proof..." : "Submit"}
             </Button>

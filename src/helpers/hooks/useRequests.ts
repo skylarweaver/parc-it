@@ -14,6 +14,7 @@ export function useRequests() {
   const [totalRequests, setTotalRequests] = useState(0);
   const [requestMsg, setRequestMsg] = useState<string | null>(null);
   const [requestLoading, setRequestLoading] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
 
   const fetchRequests = useCallback(async (page: number, pageSize: number) => {
     setLoading(true);
@@ -62,6 +63,7 @@ export function useRequests() {
       pageSize: number
     ) => {
       setRequestMsg(null);
+      setRequestSuccess(false);
       if (!requestEmoji.trim() || !requestDesc.trim()) {
         setRequestMsg('Please enter an emoji and a description.');
         return;
@@ -107,15 +109,15 @@ export function useRequests() {
           });
           if (error) {
             setRequestMsg('Failed to submit request: ' + error.message);
+            setRequestSuccess(false);
           } else {
             setRequestMsg('Request submitted!');
-            setTimeout(() => {
-              setRequestMsg(null);
-            }, 1000);
+            setRequestSuccess(true);
             fetchRequestsCallback(currentPage, pageSize);
           }
-        } catch (e: unknown) {
+        } catch {
           setRequestMsg('Unexpected error submitting request.');
+          setRequestSuccess(false);
         }
         setRequestLoading(false);
         return;
@@ -152,7 +154,7 @@ export function useRequests() {
           setRequestMsg('Your proof has been generated and is ready to use.');
           fetchRequestsCallback(currentPage, pageSize);
         }
-      } catch (e: unknown) {
+      } catch {
         setRequestMsg('Unexpected error submitting request.');
       }
       setRequestLoading(false);
@@ -160,5 +162,5 @@ export function useRequests() {
     []
   );
 
-  return { requests, loading, error, totalRequests, fetchRequests, setRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading };
+  return { requests, loading, error, totalRequests, fetchRequests, setRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading, requestSuccess, setRequestSuccess };
 } 
