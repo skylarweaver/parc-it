@@ -26,9 +26,10 @@ interface RequestFeedProps {
   parcItKey: string | null;
   userPubKey: string | null;
   fetchUpvoteCounts: (ids: string[]) => void;
+  upvotersByRequest: { [requestId: string]: string[] };
 }
 
-function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, submitUpvote, handleOpenVerify, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts }: {
+function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, submitUpvote, handleOpenVerify, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest }: {
   req: OfficeRequest;
   members: GroupMember[];
   loggedIn: boolean;
@@ -47,10 +48,12 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
   parcItKey: string | null;
   userPubKey: string | null;
   fetchUpvoteCounts: (ids: string[]) => void;
+  upvotersByRequest: { [requestId: string]: string[] };
 }) {
-  const groupMemberObjs = Array.isArray(req.group_members)
-    ? members.filter((m: GroupMember) => req.group_members.includes(m.github_username))
-    : [];
+  const upvoterPubKeys = upvotersByRequest[req.id] || [];
+  const upvoterMembers = upvoterPubKeys
+    .map(pk => members.find(m => m.public_key === pk))
+    .filter(Boolean) as GroupMember[];
   const isDoxxed = !!req.doxxed_member_id;
   return (
     <li key={req.id} className="border-2 border-gray-400  p-4 bg-white shadow-sm relative">
@@ -58,9 +61,8 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
         <span className="text-3xl w-10 text-center">{req.emoji}</span>
         <span className="flex-1 flex items-center gap-2">
           <span className="retro-text">{req.description}</span>
-          <span className="retro-label flex items-center gap-1">{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
+          <span className={`retro-label flex items-center gap-1 ${isDoxxed ? 'doxxed' : 'anonymous'}`}>{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
         </span>
-        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>Verify</Button>
         <Button
           variant="default"
           size="sm"
@@ -70,36 +72,39 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
         >
           {upvoteLoading === req.id ? "Upvoting..." : "⬆ Upvote"}
         </Button>
-        <span className="retro-upvote-count ml-2 px-2 py-1 rounded shadow border border-purple-300 font-mono text-xs" style={{ color: '#7c3aed', background: '#f3e8ff' }}>
-          {upvoteCounts[req.id] || 0} upvotes
-        </span>
         {/* Upvote message area (success/error) */}
+      </div>
+      <div className="flex items-center justify-between mt-2">
+        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>View Details</Button>
+        <div className="flex flex-row-reverse items-center gap-2">
+          <span className="retro-upvote-count ml-2 px-2 py-1 shadow border border-purple-300 font-mono text-xs" style={{ color: '#7c3aed', fontSize: '9px' }}>
+            {upvoteCounts[req.id] || 0} {upvoteCounts[req.id] === 1 ? 'upvote' : 'upvotes'}
+          </span>
+          {upvoterMembers.slice(0, 5).map((m: GroupMember, idx: number) => (
+            <img
+              key={m.id}
+              src={m.avatar_url}
+              alt={m.github_username}
+              title={m.github_username}
+              className="retro-avatar -mr-2 last:mr-0"
+              style={{ zIndex: 10 - idx }}
+            />
+          ))}
+          {upvoterMembers.length > 5 && (
+            <span className="mr-1 px-2 py-0.5 border border-gray-400 font-mono" style={{ fontSize: '10px', color: '#888', background: '#fff' }}>+{upvoterMembers.length - 5} more</span>
+          )}
+        </div>
+      </div>
         {upvoteMsg && upvoteMsg[req.id] && (
           <span className="block mt-1 text-xs font-mono" style={{ color: upvoteMsg[req.id].toLowerCase().includes('success') || upvoteMsg[req.id].toLowerCase().includes('submitted') ? '#059669' : '#b91c1c' }}>
             {upvoteMsg[req.id]}
           </span>
         )}
-      </div>
-      <div className="flex items-center gap-2 mt-2 ml-14">
-        {groupMemberObjs.slice(0, 5).map((m: GroupMember, idx: number) => (
-          <img
-            key={m.id}
-            src={m.avatar_url}
-            alt={m.github_username}
-            title={m.github_username}
-            className="retro-avatar -ml-2 first:ml-0"
-            style={{ zIndex: 10 - idx }}
-          />
-        ))}
-        {groupMemberObjs.length > 5 && (
-          <span className="ml-1 px-2 py-0.5 bg-gray-200 text-xs rounded-full border border-gray-400 font-mono">+{groupMemberObjs.length - 5} more</span>
-        )}
-      </div>
     </li>
   );
 }
 
-export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts }: RequestFeedProps) {
+export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest }: RequestFeedProps) {
   return (
     <div className="w-full max-w-xl mb-20">
       <div className="flex items-center justify-between mb-4">
@@ -124,6 +129,7 @@ export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteL
                 parcItKey={parcItKey}
                 userPubKey={userPubKey}
                 fetchUpvoteCounts={fetchUpvoteCounts}
+                upvotersByRequest={upvotersByRequest}
               />
             ))}
           </ul>

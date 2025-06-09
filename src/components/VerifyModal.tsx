@@ -28,7 +28,7 @@ export function VerifyModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
       <div className="bg-white  shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
-        <h2 className="text-xl font-bold mb-4">Verify Group Signature</h2>
+        <h2 className="text-xl font-bold mb-4">View and Verify Request</h2>
         {/* Show request info */}
         <div className="mb-2">
           <span className="font-bold">Emoji:</span> <span className="text-2xl">{request.emoji}</span>

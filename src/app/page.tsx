@@ -44,7 +44,7 @@ export default function Home() {
   const { members, fetchMembers } = useMembers();
   const { admins, fetchAdmins } = useAdmins();
   const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest } = useRequests();
-  const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, upvoteMsg } = useUpvotes();
+  const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, upvoteMsg, upvotersByRequest } = useUpvotes();
   const { verifyResult, verifyLoading, verifyRequestSignature, setVerifyResult } = useRequestVerification();
 
   const handleLogin = async (key: string, pubKey: string) => {
@@ -256,6 +256,7 @@ export default function Home() {
                 parcItKey={parcItKey}
                 userPubKey={userPubKey}
                 fetchUpvoteCounts={fetchUpvoteCounts}
+                upvotersByRequest={upvotersByRequest}
               />
             )}
           </div>

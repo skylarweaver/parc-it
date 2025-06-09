@@ -12,29 +12,36 @@ export function useUpvotes() {
   const [error, setError] = useState<string | null>(null);
   const [upvoteMsg, setUpvoteMsg] = useState<{ [requestId: string]: string }>({});
   const [upvoteLoading, setUpvoteLoading] = useState<string | null>(null);
+  const [upvotersByRequest, setUpvotersByRequest] = useState<{ [requestId: string]: string[] }>({});
 
   const fetchUpvoteCounts = useCallback(async (requestIds: string[]) => {
     setLoading(true);
     setError(null);
     if (!requestIds.length) {
       setUpvoteCounts({});
+      setUpvotersByRequest({});
       setLoading(false);
       return;
     }
     try {
       const { data, error } = await supabase
         .from('request_upvotes')
-        .select('request_id')
+        .select('request_id, nullifier')
         .in('request_id', requestIds);
       if (error) {
         setError(error.message);
         setUpvoteCounts({});
+        setUpvotersByRequest({});
       } else {
         const counts: { [requestId: string]: number } = {};
-        (data || []).forEach((row: { request_id: string }) => {
+        const upvoters: { [requestId: string]: string[] } = {};
+        (data || []).forEach((row: { request_id: string, nullifier: string }) => {
           counts[row.request_id] = (counts[row.request_id] || 0) + 1;
+          if (!upvoters[row.request_id]) upvoters[row.request_id] = [];
+          upvoters[row.request_id].push(row.nullifier);
         });
         setUpvoteCounts(counts);
+        setUpvotersByRequest(upvoters);
       }
     } catch (e: unknown) {
       if (e instanceof Error) {
@@ -43,6 +50,7 @@ export function useUpvotes() {
         setError('Unexpected error fetching upvote counts.');
       }
       setUpvoteCounts({});
+      setUpvotersByRequest({});
     }
     setLoading(false);
   }, []);
@@ -97,5 +105,5 @@ export function useUpvotes() {
     []
   );
 
-  return { upvoteCounts, loading, error, fetchUpvoteCounts, setUpvoteCounts, upvoteMsg, upvoteLoading, submitUpvote };
+  return { upvoteCounts, loading, error, fetchUpvoteCounts, setUpvoteCounts, upvoteMsg, upvoteLoading, submitUpvote, upvotersByRequest };
 } 

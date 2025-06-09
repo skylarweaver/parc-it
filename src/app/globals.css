@@ -237,6 +237,16 @@ h1, h2, h3, h4, h5, h6 {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+.retro-label.doxxed {
+  background: #fffbe6;
+  border: 1.5px solid #bba800;
+  color: #222;
+}
+.retro-label.anonymous {
+  background: #e6f0ff;
+  border: 1.5px solid #3388cc;
+  color: #222;
+}
 .retro-text {
   font-family: 'Press Start 2P', 'Tahoma', 'Courier New', monospace;
   font-size: 15px;
