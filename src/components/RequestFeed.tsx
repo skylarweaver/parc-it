@@ -83,7 +83,7 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
         <span className="text-3xl w-10 text-center">{req.emoji}</span>
         <span className="flex-1 flex items-center gap-2">
           <span className="retro-text">{req.description}</span>
-          <span className={`retro-label flex items-center gap-1 ${isDoxxed ? 'doxxed' : 'anonymous'}`}>{isDoxxed ? (<><span>Doxxed</span><span title="Your username is visible to admins and other users for this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
+          <span className={`retro-label flex items-center gap-1 ${isDoxxed ? 'doxxed' : 'anonymous'}`}>{isDoxxed ? (<><span>Doxxed</span><span title="Anyone can see the user that submitted this request." style={{cursor:'help'}}>ℹ️</span></>) : 'Anonymous'}</span>
         </span>
         <Button
           variant="default"

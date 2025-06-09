@@ -48,7 +48,7 @@ export default function RetroHeader({
           letterSpacing: 0.5,
           textShadow: '1px 1px 0 #222',
         }}>
-          Anonymous Office Request Board for 0xPARC
+          Anonymous Office Idea Board for 0xPARC
         </span>
       </span>
       {/* Login/Logout UI */}
