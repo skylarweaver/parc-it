@@ -13,6 +13,7 @@ interface VerifyModalProps {
   result: { valid: boolean; groupKeys?: string; error?: unknown; nullifier?: string | undefined } | null;
   onVerify: (message: string, signature: string) => void;
   members: { github_username: string; avatar_url: string }[];
+  upvoters?: string[];
 }
 
 export function VerifyModal({
@@ -23,12 +24,13 @@ export function VerifyModal({
   result,
   onVerify,
   members,
+  upvoters = [],
 }: VerifyModalProps) {
   if (!isOpen || !request) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
       <div className="bg-white  shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
-        <h2 className="text-xl font-bold mb-4">View and Verify Request</h2>
+        <h2 className="text-xl font-bold mb-4">View and Verify Idea</h2>
         {/* Show request info */}
         <div className="mb-2">
           <span className="font-bold">Emoji:</span> <span className="text-2xl">{request.emoji}</span>
@@ -147,7 +149,36 @@ export function VerifyModal({
             )}
           </>
         )}
-        <div className="flex gap-2 justify-end mt-4">
+        {/* Upvotes section */}
+        <div className="flex flex-col items-start mt-4 gap-2">
+          {upvoters.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 w-full justify-start border-t pt-2 mt-2">
+              <span className="text-xs text-gray-600 mr-2">Upvoted by:</span>
+              {upvoters.map((username) => {
+                const member = members.find(m => m.github_username === username);
+                const avatarUrl = member ? member.avatar_url : `https://github.com/${username}.png`;
+                return (
+                  <a
+                    key={username}
+                    href={`https://github.com/${username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={username}
+                    className="block"
+                    style={{ lineHeight: 0 }}
+                  >
+                    <img
+                      src={avatarUrl}
+                      alt={`Avatar for ${username}`}
+                      title={username}
+                      className="retro-avatar"
+                      style={{ width: 32, height: 32, borderRadius: 4, display: 'inline-block', marginRight: 2, objectFit: 'cover' }}
+                    />
+                  </a>
+                );
+              })}
+            </div>
+          )}
           <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
       </div>

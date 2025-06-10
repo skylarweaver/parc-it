@@ -312,6 +312,16 @@ export default function Home() {
         result={verifyResult}
         onVerify={verifyRequestSignature}
         members={members}
+        upvoters={
+          verifyRequest && upvotersByRequest[verifyRequest.id]
+            ? (upvotersByRequest[verifyRequest.id]
+                .map(pk => {
+                  const member = members.find(m => m.public_key === pk);
+                  return member ? member.github_username : null;
+                })
+                .filter((u): u is string => Boolean(u)))
+            : []
+        }
       />
       <KeyModal
         isOpen={keyModalOpen}
