@@ -16,6 +16,7 @@ import { RequestFeed } from "../components/RequestFeed";
 import { AddRequestModal } from "../components/AddRequestModal";
 import { VerifyModal } from "../components/VerifyModal";
 import { KeyModal } from "../components/KeyModal";
+import { SignupModal } from "../components/SignupModal";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -46,6 +47,11 @@ export default function Home() {
   const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading, requestSuccess, setRequestSuccess } = useRequests();
   const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, unUpvote, upvoteMsg, upvotersByRequest } = useUpvotes();
   const { verifyResult, verifyLoading, verifyRequestSignature, setVerifyResult } = useRequestVerification();
+  const [signupOpen, setSignupOpen] = React.useState(false);
+  const [signupLoading, setSignupLoading] = React.useState(false);
+  const [signupError, setSignupError] = React.useState<string | null>(null);
+  const [signupSuccess, setSignupSuccess] = React.useState(false);
+  const [signupAlreadySignedUp, setSignupAlreadySignedUp] = React.useState(false);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setIsAdmin(false);
@@ -213,16 +219,72 @@ export default function Home() {
     }
   }, [currentPage, pageSize, addRequestOpen, fetchRequests]);
 
+  // Handler for signup
+  const handleSignup = async (githubUsername: string, hashedKey: string, doubleBlindKey: string) => {
+    setSignupLoading(true);
+    setSignupError(null);
+    setSignupSuccess(false);
+    setSignupAlreadySignedUp(false);
+    try {
+      const resp = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ githubUsername, hashedKey })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setSignupError(data.error || "Signup failed. Please try again.");
+        setSignupLoading(false);
+        return;
+      }
+      setSignupSuccess(true);
+      setSignupAlreadySignedUp(!!data.alreadySignedUp);
+      // Store hashed key in localStorage for login flow
+      localStorage.setItem("parcItHashedKey", hashedKey);
+      // Always auto-login on success
+      setLoggedIn(true);
+      setUserPubKey(null); // No pubKey from signup, but could fetch if needed
+      setParcItKey(doubleBlindKey);
+      setLoginOpen(false);
+      localStorage.setItem("parcItKey", doubleBlindKey);
+    } catch {
+      setSignupError("Network error. Please try again.");
+    } finally {
+      setSignupLoading(false);
+    }
+  };
+
+  // Reset success state when modal is closed or opened
+  React.useEffect(() => {
+    if (!signupOpen) {
+      setSignupSuccess(false);
+      setSignupAlreadySignedUp(false);
+      setSignupError(null);
+    }
+  }, [signupOpen]);
+
   return (
     <div className="retro-container">
       <div style={{ width: '100%' }}>
-      <RetroHeader 
-        setLoginOpen={setLoginOpen}
-        loggedIn={loggedIn}
-        setLoggedIn={setLoggedIn}
-        setUserPubKey={setUserPubKey}
-        setIsAdmin={setIsAdmin}
-      />
+        <RetroHeader 
+          setLoginOpen={(open: boolean) => { setLoginOpen(open); if (open) setSignupOpen(false); }}
+          loggedIn={loggedIn}
+          setLoggedIn={setLoggedIn}
+          setUserPubKey={setUserPubKey}
+          setIsAdmin={setIsAdmin}
+        />
+        {/* Signup button next to login button if not logged in */}
+        {!loggedIn && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '8px 0 0 0', paddingRight: 24 }}>
+            <button
+              className="retro-btn"
+              onClick={() => { setSignupOpen(true); setLoginOpen(false); }}
+              style={{ minWidth: 160, marginLeft: 12 }}
+            >
+              Sign Up
+            </button>
+          </div>
+        )}
       </div>
       {/* Main Layout: Sidebar + Feed */}
       <div className="flex flex-row max-w-7xl mx-auto mt-8">
@@ -318,11 +380,20 @@ export default function Home() {
         onClose={handleCloseKeyModal}
         member={keyMember}
       />
+      <SignupModal
+        isOpen={signupOpen}
+        onClose={() => setSignupOpen(false)}
+        onSignup={handleSignup}
+        loading={signupLoading}
+        error={signupError || undefined}
+        success={signupSuccess}
+        alreadySignedUp={signupAlreadySignedUp}
+      />
       <LoginModal
         isOpen={loginOpen}
         onClose={() => setLoginOpen(false)}
         onLogin={handleLogin}
-        groupPublicKeys={members.map(m => m.public_key).join('\n')}
+        groupPublicKeys={members.map(m => m.public_key).join("\n")}
         admin={isAdmin}
       />
     </div>
