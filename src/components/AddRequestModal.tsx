@@ -136,69 +136,57 @@ export function AddRequestModal({
             disabled={requestLoading}
           />
         </div>
-        <div className="mb-4">
-          <label className="block mb-1 font-semibold">Select Group Members</label>
-          <button
-            type="button"
-            className="text-xs text-blue-700 mb-1 flex items-center gap-1 group"
-            onClick={() => setShowGroupExpander(v => !v)}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', outline: 'none' }}
-          >
-            <span className="underline">{showGroupExpander ? 'Hide group member selection' : 'Show group member selection'}</span>
-            <span style={{ fontSize: '0.9em', display: 'inline-block', transition: 'transform 0.2s' }}>
-              {showGroupExpander ? '▲' : '▼'}
-            </span>
-          </button>
-          {!showGroupExpander && !isDoxxed && (
-            <div className="text-xs text-gray-500 mb-2">Default: All group members will be included in the anonymous group signature unless you change this.</div>
-          )}
-          {showGroupExpander && !isDoxxed && (
-            <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
-              {[...(members || [])]
-                .sort((a, b) => {
-                  if (a.public_key === userPubKey) return -1;
-                  if (b.public_key === userPubKey) return 1;
-                  return a.github_username.localeCompare(b.github_username);
-                })
-                .map((m) => (
-                <label key={m.id} className="flex items-center gap-2 py-1 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedGroup.includes(m.github_username)}
-                    onChange={e => {
-                      if (e.target.checked) {
-                        setSelectedGroup([...selectedGroup, m.github_username]);
-                      } else {
-                        setSelectedGroup(selectedGroup.filter(u => u !== m.github_username));
-                      }
-                    }}
-                    disabled={requestLoading}
-                  />
-                  <img src={m.avatar_url} alt={m.github_username} className="retro-avatar" />
-                  <span className="font-mono text-xs">{m.github_username}</span>
-                </label>
-              ))}
-            </div>
-          )}
-          {showGroupExpander && isDoxxed && loggedIn && (
-            <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
-              {[...(members || [])]
-                .filter(m => m.public_key === userPubKey)
-                .map((m) => (
+        {/*
+        Group Members section is hidden in doxxed mode for now. Restore if needed.
+        */}
+        {!isDoxxed && (
+          <div className="mb-4">
+            <label className="block mb-1 font-semibold">Group Members</label>
+            {!showGroupExpander && (
+              <div className="text-xs text-gray-500 mb-2">Default: All group members will be included in the anonymous group signature unless you change this.</div>
+            )}
+            <button
+              type="button"
+              className="text-xs text-blue-700 mb-1 flex items-center gap-1 group"
+              onClick={() => setShowGroupExpander(v => !v)}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', outline: 'none' }}
+            >
+              <span className="underline">{showGroupExpander ? 'Hide group member selection' : 'Show group member selection'}</span>
+              <span style={{ fontSize: '0.9em', display: 'inline-block', transition: 'transform 0.2s' }}>
+                {showGroupExpander ? '▲' : '▼'}
+              </span>
+            </button>
+            {showGroupExpander && (
+              <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
+                {[...(members || [])]
+                  .sort((a, b) => {
+                    if (a.public_key === userPubKey) return -1;
+                    if (b.public_key === userPubKey) return 1;
+                    return a.github_username.localeCompare(b.github_username);
+                  })
+                  .map((m) => (
                   <label key={m.id} className="flex items-center gap-2 py-1 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={true}
-                      disabled={true}
+                      checked={selectedGroup.includes(m.github_username)}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setSelectedGroup([...selectedGroup, m.github_username]);
+                        } else {
+                          setSelectedGroup(selectedGroup.filter(u => u !== m.github_username));
+                        }
+                      }}
+                      disabled={requestLoading}
                     />
                     <img src={m.avatar_url} alt={m.github_username} className="retro-avatar" />
                     <span className="font-mono text-xs">{m.github_username}</span>
                   </label>
                 ))}
-            </div>
-          )}
-          <div className="text-xs text-gray-500 mt-1">{isDoxxed ? "Only you will be included in the group signature. To select other members, switch the toggle to anonymous." : showGroupExpander ? "Only the selected members will be included in the group signature proof." : null}</div>
-        </div>
+              </div>
+            )}
+            <div className="text-xs text-gray-500 mt-1">{showGroupExpander ? "Only the selected members will be included in the group signature proof." : null}</div>
+          </div>
+        )}
         {requestMsg && (
           <div className={`mb-2 text-sm font-semibold ${requestSuccess ? 'text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1' : 'text-red-600'}`}>{
             requestSuccess ? 'Your idea has been submitted.' : requestMsg
