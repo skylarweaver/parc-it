@@ -52,6 +52,7 @@ export default function Home() {
   const [signupError, setSignupError] = React.useState<string | null>(null);
   const [signupSuccess, setSignupSuccess] = React.useState(false);
   const [signupAlreadySignedUp, setSignupAlreadySignedUp] = React.useState(false);
+  const [signupPrefillKey, setSignupPrefillKey] = React.useState<string | undefined>(undefined);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setIsAdmin(false);
@@ -266,28 +267,31 @@ export default function Home() {
     }
   }, [signupOpen]);
 
+  // Handler to open signup modal with prefilled key
+  const handleSignupWithKey = (key: string) => {
+    setSignupPrefillKey(key);
+    setSignupOpen(true);
+    setLoginOpen(false);
+  };
+
+  // Reset prefill key when signup modal closes
+  React.useEffect(() => {
+    if (!signupOpen) {
+      setSignupPrefillKey(undefined);
+    }
+  }, [signupOpen]);
+
   return (
     <div className="retro-container">
       <div style={{ width: '100%' }}>
         <RetroHeader 
           setLoginOpen={(open: boolean) => { setLoginOpen(open); if (open) setSignupOpen(false); }}
+          setSignupOpen={setSignupOpen}
           loggedIn={loggedIn}
           setLoggedIn={setLoggedIn}
           setUserPubKey={setUserPubKey}
           setIsAdmin={setIsAdmin}
         />
-        {/* Signup button next to login button if not logged in */}
-        {!loggedIn && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '8px 0 0 0', paddingRight: 24 }}>
-            <button
-              className="retro-btn"
-              onClick={() => { setSignupOpen(true); setLoginOpen(false); }}
-              style={{ minWidth: 160, marginLeft: 12 }}
-            >
-              Sign Up
-            </button>
-          </div>
-        )}
       </div>
       {/* Main Layout: Sidebar + Feed */}
       <div className="flex flex-row max-w-7xl mx-auto mt-8">
@@ -298,7 +302,7 @@ export default function Home() {
           {/* Custom Copy/Intro */}
           <section className="w-full max-w-2xl mt-8 mb-8 bg-white border-2 border-gray-400  shadow p-6">
             <h1 className="retro-title mb-2 flex items-center gap-2">📝 Parc-It <span className="text-purple-500">✦</span></h1>
-            <p className="retro-subtitle mb-2 text-lg">Every office suggestion here was posted by a member of 0xPARC—but we don't know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
+            <p className="retro-subtitle mb-2 text-lg">Every office suggestion here was posted by a member of 0xPARC—but we don&apos;t know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
             <p className="text-sm text-gray-700">Submit your ideas to improve the new office. Only group members can post. If posted in anonymous mode, no one (not even admins) can see who posted the idea.</p>
             <span className="blinking">✨ Verified by ZK Proofs ✨</span>
           </section>
@@ -391,6 +395,7 @@ export default function Home() {
         error={signupError || undefined}
         success={signupSuccess}
         alreadySignedUp={signupAlreadySignedUp}
+        prefillKey={signupPrefillKey}
       />
       <LoginModal
         isOpen={loginOpen}
@@ -398,6 +403,7 @@ export default function Home() {
         onLogin={handleLogin}
         groupPublicKeys={members.map(m => m.public_key).join("\n")}
         admin={isAdmin}
+        onSignupWithKey={handleSignupWithKey}
       />
     </div>
   );

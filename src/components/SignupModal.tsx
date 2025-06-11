@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import { sha256Hex } from '../helpers/utils';
 
@@ -10,22 +10,29 @@ interface SignupModalProps {
   error?: string;
   success?: boolean;
   alreadySignedUp?: boolean;
+  prefillKey?: string;
 }
 
-export const SignupModal: React.FC<SignupModalProps> = ({ isOpen, onClose, onSignup, loading = false, error: externalError, success = false, alreadySignedUp = false }) => {
+export const SignupModal: React.FC<SignupModalProps> = ({ isOpen, onClose, onSignup, loading = false, error: externalError, success = false, alreadySignedUp = false, prefillKey }) => {
   const [githubUsername, setGithubUsername] = useState("");
   const [doubleBlindKey, setDoubleBlindKey] = useState("");
   const [error, setError] = useState("");
   const [copied1, setCopied1] = useState(false);
   const [copied2, setCopied2] = useState(false);
+  const keyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setGithubUsername("");
-      setDoubleBlindKey("");
       setError("");
+      if (prefillKey) {
+        setDoubleBlindKey(prefillKey);
+        setTimeout(() => keyRef.current?.focus(), 100);
+      } else {
+        setDoubleBlindKey("");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, prefillKey]);
 
   useEffect(() => {
     if (success) {
@@ -126,20 +133,27 @@ export const SignupModal: React.FC<SignupModalProps> = ({ isOpen, onClose, onSig
             <li className="mt-2"><b>Copy the full output </b>(including the BEGIN/END lines) and paste it below.</li>
           </ol>
         </div>
-        <input
-          className="w-full border rounded p-2 mb-2 bg-white"
-          placeholder="GitHub username"
-          value={githubUsername}
-          onChange={e => setGithubUsername(e.target.value)}
-          disabled={loading}
-        />
-        <textarea
-          className="w-full border rounded p-2 mb-2 min-h-[100px] bg-white"
-          placeholder="Paste your Double Blind Key (SSH signature) here"
-          value={doubleBlindKey}
-          onChange={e => setDoubleBlindKey(e.target.value)}
-          disabled={loading}
-        />
+        <div className="mb-2">
+          <label className="block text-xs font-semibold mb-1 text-gray-700">GitHub Username</label>
+          <input
+            className="w-full border rounded p-2 bg-white"
+            placeholder="GitHub username"
+            value={githubUsername}
+            onChange={e => setGithubUsername(e.target.value)}
+            disabled={loading}
+          />
+        </div>
+        <div className="mb-2">
+          <label className="block text-xs font-semibold mb-1 text-gray-700">Double Blind Key (SSH Signature)</label>
+          <textarea
+            ref={keyRef}
+            className="w-full border rounded p-2 min-h-[100px] bg-white"
+            placeholder="Paste your Double Blind Key (SSH signature) here"
+            value={doubleBlindKey}
+            onChange={e => setDoubleBlindKey(e.target.value)}
+            disabled={loading}
+          />
+        </div>
         {(error || externalError) && <div className="text-red-600 mb-2">{error || externalError}</div>}
         {success && !(error || externalError) && (
           <div className="text-green-600 mb-2">
