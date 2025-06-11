@@ -2,7 +2,7 @@
 import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { getPlonky2Worker } from "../helpers/plonky2/utils";
+import { getPlonky2Worker, getDKGroupCheck } from "../helpers/plonky2/utils";
 import RetroHeader from "../components/RetroHeader";
 import { OfficeRequest, GroupMember } from "../types/models";
 import { is4096RsaKey, sha256Hex } from "../helpers/utils";
@@ -245,12 +245,31 @@ export default function Home() {
       setSignupAlreadySignedUp(!!data.alreadySignedUp);
       // Store hashed key in localStorage for login flow
       localStorage.setItem("parcItHashedKey", hashedKey);
-      // Always auto-login on success
+      // Derive and store public key just like in login
+      const groupPublicKeys = members.map(m => m.public_key).join("\n");
+      let userPubKey: string | null = null;
+      try {
+        const result = await getDKGroupCheck(groupPublicKeys, doubleBlindKey);
+        const idx = result.user_public_key_index;
+        const groupKeysArray = groupPublicKeys.split('\n');
+        if (idx !== undefined && idx >= 0 && idx < groupKeysArray.length) {
+          userPubKey = groupKeysArray[idx];
+        }
+      } catch {
+        // fallback: do not set userPubKey
+      }
       setLoggedIn(true);
-      setUserPubKey(null); // No pubKey from signup, but could fetch if needed
+      setUserPubKey(userPubKey);
       setParcItKey(doubleBlindKey);
       setLoginOpen(false);
       localStorage.setItem("parcItKey", doubleBlindKey);
+      if (userPubKey) {
+        localStorage.setItem("parcItPubKey", userPubKey);
+      }
+      // Start circuit initialization in the background
+      const worker = getPlonky2Worker();
+      const id = Date.now().toString() + Math.random().toString(16);
+      worker.postMessage({ id, op: 'initCircuit', args: {} });
     } catch {
       setSignupError("Network error. Please try again.");
     } finally {
