@@ -17,6 +17,56 @@ Parc-It! is an anonymous office request board for the 0xPARC office. The goal is
 
 ---
 
+## Privacy-Preserving Login & Authentication (2024 Update)
+
+### Motivation
+Parc-It! is designed to maximize privacy for group members. The goal is to allow users to prove group membership and submit requests **without revealing their identity** to the server or other users, unless they explicitly choose to doxx themselves. We avoid traditional authentication (OAuth, passwords, cookies) and instead use cryptographic group signatures and a hashed key system.
+
+### How It Works
+- **Double Blind Key (DBK):**
+  - Each user generates a unique SSH signature (the "Double Blind Key") using their private SSH key.
+  - This DBK is never sent to the server in plaintext.
+- **Hashed Key System:**
+  - On signup, the client hashes the DBK using SHA-256 and sends only the hash to the server.
+  - The server stores only the hash, never the raw DBK.
+  - On login, the client fetches the list of all valid DBK hashes from the server and checks locally if their hash is present. **The DBK or its hash is never sent to the server during login.**
+  - If the hash is present, the user is allowed to log in; otherwise, they must sign up.
+- **Group Signature Proofs:**
+  - When submitting a new idea/request, the user generates a group signature proof using their DBK and the group's public keys.
+  - The server verifies the proof, confirming the request comes from a group member, but cannot tell which member.
+  - No additional authentication is required for submitting requests—**the group signature proof is the only requirement.**
+- **Admin Actions:**
+  - Admins are a subset of group members, identified by their public key.
+  - Admin actions (add/remove member, delete request) require both a valid DBK hash and admin status.
+
+### Privacy Model
+- **No server-side login sessions or cookies.**
+- **No OAuth, passwords, or email addresses.**
+- **No DBK or public key is sent to the server during login.**
+- **All group membership checks are done client-side using the hash list.**
+- **Only the group signature proof is required for submitting requests.**
+- **Admins are verified by public key, but all admin actions are still privacy-preserving for regular requests.**
+
+### User Flow (Updated)
+- **Login:**
+  1. User pastes their Double Blind Key (SSH signature).
+  2. The app hashes the key and checks it against the list of valid hashes fetched from the server.
+  3. If present, the user is logged in locally (no info sent to server).
+  4. If not present, the user is prompted to sign up (hash sent to server once).
+- **Signup:**
+  1. User pastes their GitHub username and Double Blind Key.
+  2. The app hashes the key and sends the hash and username to the server.
+  3. The server stores the hash and associates it with the user.
+- **Submit Request:**
+  1. User generates a group signature proof using their DBK and the group's public keys.
+  2. The proof is sent to the server with the request.
+  3. The server verifies the proof and records the request if valid.
+- **Admin Actions:**
+  1. Admins log in with their DBK as above.
+  2. Admin actions require both a valid DBK hash and admin status (checked server-side).
+
+---
+
 ## User Flows
 
 - **Public:** View requests, group members, and technical details. Cannot submit or upvote.
@@ -161,7 +211,9 @@ Original repo: https://github.com/dgulotta/double-blind
 
 - Use docs folder for documentation.
 - Desktop-first, always-on retro theme.
-- No OAuth or passwords; login via Double Blind Key only.
+- **No OAuth or passwords; login via Double Blind Key only.**
+- **No server-side login sessions; all group membership checks are client-side and privacy-preserving.**
+- **No DBK or public key is sent to the server during login.**
 - Admins identified by hardcoded SSH pub keys.
 - Fetch only first RSA key from GitHub .keys every 10 minutes.
 - Avoid large fields in list queries; fetch only what is needed.

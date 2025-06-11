@@ -3,11 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { validateKeyHash } from '../../../helpers/utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-console.log('supabaseUrl', supabaseUrl);
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-console.log('supabaseAnonKey', supabaseAnonKey);
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-console.log('supabase', supabase);
+const supabaseServiceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SEVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 export async function POST(req: NextRequest) {
   try {

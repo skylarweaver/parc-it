@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { verifySignature } from '../../../helpers/plonky2/utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseServiceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SEVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 export async function POST(req: NextRequest) {
   try {
