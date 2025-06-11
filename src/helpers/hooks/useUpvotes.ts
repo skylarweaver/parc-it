@@ -6,6 +6,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Utility to get key hash from localStorage
+function getKeyHash() {
+  return (typeof window !== 'undefined') ? localStorage.getItem('parcItHashedKey') : null;
+}
+
 export function useUpvotes() {
   const [upvoteCounts, setUpvoteCounts] = useState<{ [requestId: string]: number }>({});
   const [loading, setLoading] = useState(false);
@@ -74,7 +79,8 @@ export function useUpvotes() {
       setUpvoteLoading(req.id);
       setUpvoteMsg((prev) => ({ ...prev, [req.id]: '' }));
       try {
-        const payload = { requestId: req.id, publicKey: userPubKey };
+        const keyHash = getKeyHash();
+        const payload = { requestId: req.id, publicKey: userPubKey, keyHash };
         console.log('Upvote API payload:', payload);
         const res = await fetch('/api/upvote-public', {
           method: 'POST',
@@ -123,7 +129,8 @@ export function useUpvotes() {
       setUpvoteLoading(req.id);
       setUpvoteMsg((prev) => ({ ...prev, [req.id]: '' }));
       try {
-        const payload = { requestId: req.id, publicKey: userPubKey };
+        const keyHash = getKeyHash();
+        const payload = { requestId: req.id, publicKey: userPubKey, keyHash };
         const res = await fetch('/api/upvote-public', {
           method: 'DELETE',
           headers: {

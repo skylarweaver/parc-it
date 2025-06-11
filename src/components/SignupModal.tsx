@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
-
-// Stub: Replace with a real hash function if needed
-async function hashDoubleBlindKey(key: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(key);
-  const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
+import { sha256Hex } from '../helpers/utils';
 
 interface SignupModalProps {
   isOpen: boolean;
@@ -62,8 +55,8 @@ export const SignupModal: React.FC<SignupModalProps> = ({ isOpen, onClose, onSig
     setError("");
     if (!validateInputs()) return;
     try {
-      // Hash the double blind key locally
-      const hashedKey = await hashDoubleBlindKey(doubleBlindKey);
+      // Hash the double blind key locally using shared utility
+      const hashedKey = await sha256Hex(doubleBlindKey);
       // Call the parent handler with DK for auto-login
       onSignup(githubUsername.trim(), hashedKey, doubleBlindKey);
     } catch {

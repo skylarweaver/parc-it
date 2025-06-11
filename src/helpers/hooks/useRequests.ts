@@ -7,6 +7,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Utility to get key hash from localStorage
+function getKeyHash() {
+  return (typeof window !== 'undefined') ? localStorage.getItem('parcItHashedKey') : null;
+}
+
 export function useRequests() {
   const [requests, setRequests] = useState<OfficeRequest[]>([]);
   const [loading, setLoading] = useState(false);
@@ -96,19 +101,21 @@ export function useRequests() {
           }
           const groupMembers = [self.github_username];
           const doxxedMemberId = self.id;
-          const { error } = await supabase.from('office_requests').insert({
-            emoji: requestEmoji.trim(),
-            description: requestDesc.trim(),
-            signature: null,
-            group_id: '00000000-0000-0000-0000-000000000000',
-            public_signal: 'dummy-signal',
-            group_members: groupMembers,
-            doxxed_member_id: doxxedMemberId,
-            deleted: false,
-            metadata: {},
+          const keyHash = getKeyHash();
+          const res = await fetch('/api/office-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              emoji: requestEmoji.trim(),
+              description: requestDesc.trim(),
+              group_members: groupMembers,
+              doxxed_member_id: doxxedMemberId,
+              keyHash,
+            }),
           });
-          if (error) {
-            setRequestMsg('Failed to submit request: ' + error.message);
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            setRequestMsg(data.error || 'Failed to submit request.');
             setRequestSuccess(false);
           } else {
             setRequestMsg('Request submitted!');

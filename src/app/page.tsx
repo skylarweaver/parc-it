@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getPlonky2Worker } from "../helpers/plonky2/utils";
 import RetroHeader from "../components/RetroHeader";
 import { OfficeRequest, GroupMember } from "../types/models";
-import { is4096RsaKey } from "../helpers/utils";
+import { is4096RsaKey, sha256Hex } from "../helpers/utils";
 import { useMembers } from "../helpers/hooks/useMembers";
 import { useAdmins } from "../helpers/hooks/useAdmins";
 import { useRequests } from "../helpers/hooks/useRequests";
@@ -75,6 +75,9 @@ export default function Home() {
       setLoginOpen(false);
       localStorage.setItem("parcItKey", key);
       localStorage.setItem("parcItPubKey", pubKey);
+      // Compute and store SHA-256 hash of the key
+      const hashedKey = await sha256Hex(key);
+      localStorage.setItem("parcItHashedKey", hashedKey);
       // Start circuit initialization in the background
       const worker = getPlonky2Worker();
       const id = Date.now().toString() + Math.random().toString(16);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { validateKeyHash } from '../../../helpers/utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -8,9 +9,13 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // New upvote-public route: upvotes by public key, no cryptographic proof required
 export async function POST(req: NextRequest) {
   try {
-    const { requestId, publicKey } = await req.json();
-    if (!requestId || !publicKey) {
+    const { requestId, publicKey, keyHash } = await req.json();
+    if (!requestId || !publicKey || !keyHash) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    }
+    const keyCheck = await validateKeyHash(keyHash, publicKey, supabase);
+    if (!keyCheck.valid) {
+      return NextResponse.json({ error: keyCheck.error || 'Invalid or missing key hash or public key.' }, { status: 401 });
     }
     // Check for duplicate upvote (publicKey stored in nullifier column)
     const { data: existing } = await supabase
@@ -37,9 +42,13 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { requestId, publicKey } = await req.json();
-    if (!requestId || !publicKey) {
+    const { requestId, publicKey, keyHash } = await req.json();
+    if (!requestId || !publicKey || !keyHash) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    }
+    const keyCheck = await validateKeyHash(keyHash, publicKey, supabase);
+    if (!keyCheck.valid) {
+      return NextResponse.json({ error: keyCheck.error || 'Invalid or missing key hash or public key.' }, { status: 401 });
     }
     const { error: deleteError } = await supabase
       .from('request_upvotes')
