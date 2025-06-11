@@ -1,63 +1,73 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
-import { getDKGroupCheck } from "../helpers/plonky2/utils";
 import { sha256Hex } from '../helpers/utils';
 
-interface LoginModalProps {
+interface SignupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (key: string, pubKey: string) => void;
-  groupPublicKeys: string;
-  admin?: boolean;
-  onSignupWithKey?: (key: string) => void;
+  onSignup: (githubUsername: string, hashedKey: string, doubleBlindKey: string) => void;
+  loading?: boolean;
+  error?: string;
+  success?: boolean;
+  alreadySignedUp?: boolean;
+  prefillKey?: string;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, groupPublicKeys, admin, onSignupWithKey }) => {
-  const [key, setKey] = useState("");
+export const SignupModal: React.FC<SignupModalProps> = ({ isOpen, onClose, onSignup, loading = false, error: externalError, success = false, alreadySignedUp = false, prefillKey }) => {
+  const [githubUsername, setGithubUsername] = useState("");
+  const [doubleBlindKey, setDoubleBlindKey] = useState("");
   const [error, setError] = useState("");
   const [copied1, setCopied1] = useState(false);
   const [copied2, setCopied2] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const keyRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setGithubUsername("");
+      setError("");
+      if (prefillKey) {
+        setDoubleBlindKey(prefillKey);
+        setTimeout(() => keyRef.current?.focus(), 100);
+      } else {
+        setDoubleBlindKey("");
+      }
+    }
+  }, [isOpen, prefillKey]);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [success, onClose]);
 
   if (!isOpen) return null;
 
-  const handleLogin = async () => {
-    setError("");
-    setLoading(true);
-    if (!groupPublicKeys || typeof groupPublicKeys !== 'string' || groupPublicKeys.length === 0) {
-      setError("No group public keys are loaded. Please contact an admin.");
-      setLoading(false);
-      return;
+  const validateInputs = () => {
+    if (!githubUsername.trim()) {
+      setError("GitHub username is required.");
+      return false;
     }
+    if (!doubleBlindKey.trim()) {
+      setError("Double Blind Key is required.");
+      return false;
+    }
+    // Add more validation as needed (format, length, etc.)
+    return true;
+  };
+
+  const handleSignup = async () => {
+    setError("");
+    if (!validateInputs()) return;
     try {
-      const res = await fetch('/api/group-members/hashed-keys');
-      const { hashedKeys } = await res.json();
-      if (!Array.isArray(hashedKeys)) {
-        setError("Failed to fetch hashed keys. Try again later.");
-        setLoading(false);
-        return;
-      }
-      const hashed = await sha256Hex(key);
-      if (!hashedKeys.includes(hashed)) {
-        setError("Your Double Blind Key is not registered. Please sign up first.");
-        setLoading(false);
-        return;
-      }
-      const result = await getDKGroupCheck(groupPublicKeys, key);
-      const idx = result.user_public_key_index;
-      const groupKeysArray = groupPublicKeys.split('\n');
-      console.log({ groupPublicKeys, groupKeysArray, idx, result });
-      if (idx === undefined || idx < 0 || idx >= groupKeysArray.length) {
-        setError("Your Double Blind Key is recognized, but the associated public key could not be found in the group. Message an admin to add you to the group.");
-        setLoading(false);
-        return;
-      }
-      const userPubKey = groupKeysArray[idx];
-      onLogin(key, userPubKey);
-      setLoading(false);
-    } catch (e) {
-      setError("Error checking group membership: " + (e instanceof Error ? e.message : String(e)));
-      setLoading(false);
+      // Hash the double blind key locally using shared utility
+      const hashedKey = await sha256Hex(doubleBlindKey);
+      // Call the parent handler with DK for auto-login
+      onSignup(githubUsername.trim(), hashedKey, doubleBlindKey);
+    } catch {
+      setError("Failed to hash or submit your key. Please try again.");
     }
   };
 
@@ -65,7 +75,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="retro-modal w-full max-w-md relative">
         <div className="retro-modal-header">
-          <span>Login with Double Blind Key</span>
+          <span>Sign Up with Double Blind Key</span>
           <button className="absolute top-2 right-3 text-xl" onClick={onClose} style={{ color: '#fff', background: 'none', border: 'none', fontWeight: 'bold', fontSize: 22, cursor: 'pointer', right: 12, top: 8 }}>&times;</button>
         </div>
         <div className="mb-4 text-sm text-gray-700">
@@ -122,41 +132,40 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             </li>
             <li className="mt-2"><b>Copy the full output </b>(including the BEGIN/END lines) and paste it below.</li>
           </ol>
-          {/* <p className="text-xs text-gray-500">For more details, see the <a href="https://github.com/doubleblind-xyz/double-blind" target="_blank" rel="noopener noreferrer" className="underline">double-blind documentation</a>.</p> */}
-          {admin && (
-            <div className="mt-4 text-red-600 font-semibold text-sm">
-              Warning: If you log in as an admin, your SSH public key will be sent to the server for admin verification. For maximum privacy, allow time between performing admin actions and sending anonymous office ideas.
-            </div>
-          )}
         </div>
-        <textarea
-          className="w-full border rounded p-2 mb-2 min-h-[100px] bg-white"
-          placeholder="Paste your Double Blind Key (SSH signature) here"
-          value={key}
-          onChange={e => setKey(e.target.value)}
-          style={{ backgroundColor: 'white' }}
-        />
-        {error && (
-          <div className="text-red-600 mb-2 flex flex-col items-center">
-            <span>{error}</span>
-            {onSignupWithKey && error.includes('not registered') && (
-              <Button 
-                variant="default" 
-                className="mt-2 mx-auto" 
-                style={{ display: 'block', marginLeft: 'auto', marginRight: 'auto' }}
-                onClick={() => onSignupWithKey(key)}
-              >
-                Sign up with this key
-              </Button>
-            )}
+        <div className="mb-2">
+          <label className="block text-xs font-semibold mb-1 text-gray-700">GitHub Username</label>
+          <input
+            className="w-full border rounded p-2 bg-white"
+            placeholder="GitHub username"
+            value={githubUsername}
+            onChange={e => setGithubUsername(e.target.value)}
+            disabled={loading}
+          />
+        </div>
+        <div className="mb-2">
+          <label className="block text-xs font-semibold mb-1 text-gray-700">Double Blind Key (SSH Signature)</label>
+          <textarea
+            ref={keyRef}
+            className="w-full border rounded p-2 min-h-[100px] bg-white"
+            placeholder="Paste your Double Blind Key (SSH signature) here"
+            value={doubleBlindKey}
+            onChange={e => setDoubleBlindKey(e.target.value)}
+            disabled={loading}
+          />
+        </div>
+        {(error || externalError) && <div className="text-red-600 mb-2">{error || externalError}</div>}
+        {success && !(error || externalError) && (
+          <div className="text-green-600 mb-2">
+            {alreadySignedUp ? 'You were already signed up. You are now logged in.' : 'Signup successful! You are now logged in.'}
           </div>
         )}
-        <Button 
-          className="w-full" 
-          onClick={handleLogin} 
-          disabled={!!loading || (!!error && error.includes('not registered'))}
+        <Button
+          className="w-full"
+          onClick={success ? onClose : handleSignup}
+          disabled={loading}
         >
-          {loading ? 'Checking...' : 'Login'}
+          {success ? "Close" : loading ? "Signing up..." : "Sign Up"}
         </Button>
       </div>
     </div>

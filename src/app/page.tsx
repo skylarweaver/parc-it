@@ -2,10 +2,10 @@
 import { LoginModal } from "../components/LoginModal";
 import React, { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { getPlonky2Worker } from "../helpers/plonky2/utils";
+import { getPlonky2Worker, getDKGroupCheck } from "../helpers/plonky2/utils";
 import RetroHeader from "../components/RetroHeader";
 import { OfficeRequest, GroupMember } from "../types/models";
-import { is4096RsaKey } from "../helpers/utils";
+import { is4096RsaKey, sha256Hex } from "../helpers/utils";
 import { useMembers } from "../helpers/hooks/useMembers";
 import { useAdmins } from "../helpers/hooks/useAdmins";
 import { useRequests } from "../helpers/hooks/useRequests";
@@ -16,6 +16,7 @@ import { RequestFeed } from "../components/RequestFeed";
 import { AddRequestModal } from "../components/AddRequestModal";
 import { VerifyModal } from "../components/VerifyModal";
 import { KeyModal } from "../components/KeyModal";
+import { SignupModal } from "../components/SignupModal";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -46,6 +47,12 @@ export default function Home() {
   const { requests, loading: requestsLoading, totalRequests, fetchRequests, requestMsg, requestLoading, submitRequest, setRequestMsg, setRequestLoading, requestSuccess, setRequestSuccess } = useRequests();
   const { upvoteCounts, upvoteLoading, fetchUpvoteCounts, submitUpvote, unUpvote, upvoteMsg, upvotersByRequest } = useUpvotes();
   const { verifyResult, verifyLoading, verifyRequestSignature, setVerifyResult } = useRequestVerification();
+  const [signupOpen, setSignupOpen] = React.useState(false);
+  const [signupLoading, setSignupLoading] = React.useState(false);
+  const [signupError, setSignupError] = React.useState<string | null>(null);
+  const [signupSuccess, setSignupSuccess] = React.useState(false);
+  const [signupAlreadySignedUp, setSignupAlreadySignedUp] = React.useState(false);
+  const [signupPrefillKey, setSignupPrefillKey] = React.useState<string | undefined>(undefined);
 
   const handleLogin = async (key: string, pubKey: string) => {
     setIsAdmin(false);
@@ -69,6 +76,9 @@ export default function Home() {
       setLoginOpen(false);
       localStorage.setItem("parcItKey", key);
       localStorage.setItem("parcItPubKey", pubKey);
+      // Compute and store SHA-256 hash of the key
+      const hashedKey = await sha256Hex(key);
+      localStorage.setItem("parcItHashedKey", hashedKey);
       // Start circuit initialization in the background
       const worker = getPlonky2Worker();
       const id = Date.now().toString() + Math.random().toString(16);
@@ -213,16 +223,94 @@ export default function Home() {
     }
   }, [currentPage, pageSize, addRequestOpen, fetchRequests]);
 
+  // Handler for signup
+  const handleSignup = async (githubUsername: string, hashedKey: string, doubleBlindKey: string) => {
+    setSignupLoading(true);
+    setSignupError(null);
+    setSignupSuccess(false);
+    setSignupAlreadySignedUp(false);
+    try {
+      const resp = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ githubUsername, hashedKey })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setSignupError(data.error || "Signup failed. Please try again.");
+        setSignupLoading(false);
+        return;
+      }
+      setSignupSuccess(true);
+      setSignupAlreadySignedUp(!!data.alreadySignedUp);
+      // Store hashed key in localStorage for login flow
+      localStorage.setItem("parcItHashedKey", hashedKey);
+      // Derive and store public key just like in login
+      const groupPublicKeys = members.map(m => m.public_key).join("\n");
+      let userPubKey: string | null = null;
+      try {
+        const result = await getDKGroupCheck(groupPublicKeys, doubleBlindKey);
+        const idx = result.user_public_key_index;
+        const groupKeysArray = groupPublicKeys.split('\n');
+        if (idx !== undefined && idx >= 0 && idx < groupKeysArray.length) {
+          userPubKey = groupKeysArray[idx];
+        }
+      } catch {
+        // fallback: do not set userPubKey
+      }
+      setLoggedIn(true);
+      setUserPubKey(userPubKey);
+      setParcItKey(doubleBlindKey);
+      setLoginOpen(false);
+      localStorage.setItem("parcItKey", doubleBlindKey);
+      if (userPubKey) {
+        localStorage.setItem("parcItPubKey", userPubKey);
+      }
+      // Start circuit initialization in the background
+      const worker = getPlonky2Worker();
+      const id = Date.now().toString() + Math.random().toString(16);
+      worker.postMessage({ id, op: 'initCircuit', args: {} });
+    } catch {
+      setSignupError("Network error. Please try again.");
+    } finally {
+      setSignupLoading(false);
+    }
+  };
+
+  // Reset success state when modal is closed or opened
+  React.useEffect(() => {
+    if (!signupOpen) {
+      setSignupSuccess(false);
+      setSignupAlreadySignedUp(false);
+      setSignupError(null);
+    }
+  }, [signupOpen]);
+
+  // Handler to open signup modal with prefilled key
+  const handleSignupWithKey = (key: string) => {
+    setSignupPrefillKey(key);
+    setSignupOpen(true);
+    setLoginOpen(false);
+  };
+
+  // Reset prefill key when signup modal closes
+  React.useEffect(() => {
+    if (!signupOpen) {
+      setSignupPrefillKey(undefined);
+    }
+  }, [signupOpen]);
+
   return (
     <div className="retro-container">
       <div style={{ width: '100%' }}>
-      <RetroHeader 
-        setLoginOpen={setLoginOpen}
-        loggedIn={loggedIn}
-        setLoggedIn={setLoggedIn}
-        setUserPubKey={setUserPubKey}
-        setIsAdmin={setIsAdmin}
-      />
+        <RetroHeader 
+          setLoginOpen={(open: boolean) => { setLoginOpen(open); if (open) setSignupOpen(false); }}
+          setSignupOpen={setSignupOpen}
+          loggedIn={loggedIn}
+          setLoggedIn={setLoggedIn}
+          setUserPubKey={setUserPubKey}
+          setIsAdmin={setIsAdmin}
+        />
       </div>
       {/* Main Layout: Sidebar + Feed */}
       <div className="flex flex-row max-w-7xl mx-auto mt-8">
@@ -233,7 +321,7 @@ export default function Home() {
           {/* Custom Copy/Intro */}
           <section className="w-full max-w-2xl mt-8 mb-8 bg-white border-2 border-gray-400  shadow p-6">
             <h1 className="retro-title mb-2 flex items-center gap-2">📝 Parc-It <span className="text-purple-500">✦</span></h1>
-            <p className="retro-subtitle mb-2 text-lg">Every office suggestion here was posted by a member of 0xPARC—but we don't know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
+            <p className="retro-subtitle mb-2 text-lg">Every office suggestion here was posted by a member of 0xPARC—but we don&apos;t know which one, thanks to Zero Knowledge Proofs and Group Signatures.</p>
             <p className="text-sm text-gray-700">Submit your ideas to improve the new office. Only group members can post. If posted in anonymous mode, no one (not even admins) can see who posted the idea.</p>
             <span className="blinking">✨ Verified by ZK Proofs ✨</span>
           </section>
@@ -328,12 +416,23 @@ export default function Home() {
         onClose={handleCloseKeyModal}
         member={keyMember}
       />
+      <SignupModal
+        isOpen={signupOpen}
+        onClose={() => setSignupOpen(false)}
+        onSignup={handleSignup}
+        loading={signupLoading}
+        error={signupError || undefined}
+        success={signupSuccess}
+        alreadySignedUp={signupAlreadySignedUp}
+        prefillKey={signupPrefillKey}
+      />
       <LoginModal
         isOpen={loginOpen}
         onClose={() => setLoginOpen(false)}
         onLogin={handleLogin}
-        groupPublicKeys={members.map(m => m.public_key).join('\n')}
+        groupPublicKeys={members.map(m => m.public_key).join("\n")}
         admin={isAdmin}
+        onSignupWithKey={handleSignupWithKey}
       />
     </div>
   );

@@ -4,6 +4,7 @@ interface RetroHeaderProps {
   loggedIn: boolean;
   loading?: boolean;
   setLoginOpen: (open: boolean) => void;
+  setSignupOpen: (open: boolean) => void;
   setLoggedIn: (loggedIn: boolean) => void;
   setUserPubKey: (pubKey: string | null) => void;
   setIsAdmin: (isAdmin: boolean) => void;
@@ -13,6 +14,7 @@ export default function RetroHeader({
   loggedIn,
   loading = false,
   setLoginOpen,
+  setSignupOpen,
   setLoggedIn,
   setUserPubKey,
   setIsAdmin
@@ -51,17 +53,44 @@ export default function RetroHeader({
           Anonymous Office Idea Board for 0xPARC
         </span>
       </span>
-      {/* Login/Logout UI */}
+      {/* Login/Signup UI */}
       <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
         {!loggedIn ? (
-          <button
-            className="retro-btn"
-            onClick={() => setLoginOpen(true)}
-            disabled={loading}
-            style={{ minWidth: 160, marginLeft: 12 }}
-          >
-            {loading ? "Logging in..." : "Login with Double Blind Key"}
-          </button>
+          <>
+            <button
+              className="retro-btn"
+              onClick={() => setSignupOpen(true)}
+              disabled={loading}
+              style={{
+                minWidth: 100,
+                marginRight: 4,
+                background: '#e0e0e0',
+                color: '#222',
+                fontWeight: 500,
+                border: '1.5px solid #888',
+                opacity: 0.85,
+                boxShadow: 'none',
+                fontSize: 15,
+              }}
+            >
+              Sign Up
+            </button>
+            <button
+              className="retro-btn"
+              onClick={() => setLoginOpen(true)}
+              disabled={loading}
+              style={{
+                minWidth: 120,
+                fontWeight: 700,
+                background: '#fff',
+                color: '#000080',
+                border: '2px solid #222',
+                fontSize: 16,
+              }}
+            >
+              {loading ? "Logging in..." : "Login"}
+            </button>
+          </>
         ) : (
           <>
             <span style={{

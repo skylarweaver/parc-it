@@ -17,7 +17,7 @@ export function useAdmins() {
     try {
       const { data, error } = await supabase
         .from('admins')
-        .select('id, github_username');
+        .select('id, github_username, public_key');
       if (error) {
         setError(error.message);
         setAdmins([]);

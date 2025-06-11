@@ -6,12 +6,20 @@ import { LoginModal } from "../../components/LoginModal";
 import { useMembers } from "../../helpers/hooks/useMembers";
 import { useAdmins } from "../../helpers/hooks/useAdmins";
 import { useRequests } from "../../helpers/hooks/useRequests";
-import { is4096RsaKey } from "../../helpers/utils";
+import { is4096RsaKey, sha256Hex } from "../../helpers/utils";
 import Link from "next/link";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Utility to get key hash and public key from localStorage
+function getKeyHash() {
+  return (typeof window !== 'undefined') ? localStorage.getItem('parcItHashedKey') : null;
+}
+function getPublicKey() {
+  return (typeof window !== 'undefined') ? localStorage.getItem('parcItPubKey') : null;
+}
 
 export default function AdminPage() {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -65,12 +73,17 @@ export default function AdminPage() {
         setIsAdmin(true);
         setLoginStatus("Admin login successful!");
         setLoginOpen(false);
+        localStorage.setItem('parcItKey', key);
+        // Compute and store SHA-256 hash of the key
+        const hashedKey = await sha256Hex(key);
+        localStorage.setItem('parcItHashedKey', hashedKey);
+        localStorage.setItem('parcItPubKey', pubKey);
       } else {
         setLoginStatus("You are not an admin. Access denied.");
         setUserPubKey(null);
         setIsAdmin(false);
       }
-    } catch (e) {
+    } catch {
       setLoginStatus("Unexpected error during login. Please try again.");
       setUserPubKey(null);
       setIsAdmin(false);
@@ -81,9 +94,23 @@ export default function AdminPage() {
   const handleDeleteRequest = async (id: string) => {
     setDeleteLoading(true);
     try {
-      await supabase.from("office_requests").update({ deleted: true }).eq("id", id);
-      await (window as unknown as { loadRequests: (page: number, pageSize: number) => void }).loadRequests(1, 100);
-    } catch {}
+      const keyHash = getKeyHash();
+      const publicKey = getPublicKey();
+      const res = await fetch('/api/admin-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteRequest', targetId: id, keyHash, publicKey }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAdminMsg(data.error || 'Failed to delete request.');
+      } else {
+        setAdminMsg('Request deleted successfully.');
+        await (window as unknown as { loadRequests: (page: number, pageSize: number) => void }).loadRequests(1, 100);
+      }
+    } catch {
+      setAdminMsg('Unexpected error deleting request.');
+    }
     setDeleteLoading(false);
   };
 
@@ -116,25 +143,30 @@ export default function AdminPage() {
         setAdminMsg("No 4096-bit ssh-rsa public key found for this GitHub user. Please ask them to generate one and add it to their GitHub account.");
         return;
       }
-      const { error } = await supabase.from("group_members").insert({
-        github_username: username,
-        avatar_url,
-        public_key,
+      const keyHash = getKeyHash();
+      const publicKey = getPublicKey();
+      const res = await fetch('/api/admin-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'addMember',
+          githubUsername: username,
+          avatar_url,
+          public_key,
+          keyHash,
+          publicKey,
+        }),
       });
-      if (error) {
-        setAdminMsg("Failed to add member: " + error.message);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAdminMsg(data.error || 'Failed to add member.');
       } else {
-        setAdminMsg("Member added successfully.");
+        setAdminMsg('Member added successfully.');
         setAddUsername("");
         await (window as unknown as { loadMembers: () => void }).loadMembers();
       }
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        console.error(e);
-        setAdminMsg("Unexpected error adding member: " + e.message);
-      } else {
-        setAdminMsg("Unexpected error adding member: " + JSON.stringify(e));
-      }
+    } catch {
+      setAdminMsg("Unexpected error adding member.");
     }
   };
 
@@ -142,9 +174,23 @@ export default function AdminPage() {
   const handleRemoveMember = async (id: string) => {
     setAdminMsg(null);
     try {
-      await supabase.from("group_members").delete().eq("id", id);
-      await (window as unknown as { loadMembers: () => void }).loadMembers();
-    } catch {}
+      const keyHash = getKeyHash();
+      const publicKey = getPublicKey();
+      const res = await fetch('/api/admin-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'removeMember', targetId: id, keyHash, publicKey }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAdminMsg(data.error || 'Failed to remove member.');
+      } else {
+        setAdminMsg('Member removed successfully.');
+        await (window as unknown as { loadMembers: () => void }).loadMembers();
+      }
+    } catch {
+      setAdminMsg('Unexpected error removing member.');
+    }
   };
 
   // Add admin
@@ -172,24 +218,29 @@ export default function AdminPage() {
         setAdminAdminMsg("This user is already an admin.");
         return;
       }
-      const { error } = await supabase.from("admins").insert({
-        github_username: username,
-        public_key,
+      const keyHash = getKeyHash();
+      const publicKey = getPublicKey();
+      const res = await fetch('/api/admin-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'addAdmin',
+          githubUsername: username,
+          public_key,
+          keyHash,
+          publicKey,
+        }),
       });
-      if (error) {
-        setAdminAdminMsg("Failed to add admin: " + error.message);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAdminAdminMsg(data.error || 'Failed to add admin.');
       } else {
-        setAdminAdminMsg("Admin added successfully.");
+        setAdminAdminMsg('Admin added successfully.');
         setAddAdminUsername("");
         await (window as unknown as { loadAdmins: () => void }).loadAdmins();
       }
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        console.error(e);
-        setAdminAdminMsg("Unexpected error adding admin: " + e.message);
-      } else {
-        setAdminAdminMsg("Unexpected error adding admin: " + JSON.stringify(e));
-      }
+    } catch {
+      setAdminAdminMsg("Unexpected error adding admin.");
     }
   };
 
@@ -198,14 +249,25 @@ export default function AdminPage() {
     setAdminAdminMsg(null);
     try {
       if (public_key === userPubKey) {
-        setAdminAdminMsg("You cannot remove yourself as admin.");
+        setAdminAdminMsg('You cannot remove yourself as admin.');
         return;
       }
-      await supabase.from("admins").delete().eq("id", id);
-      await (window as unknown as { loadAdmins: () => void }).loadAdmins();
-      setAdminAdminMsg("Admin removed successfully.");
+      const keyHash = getKeyHash();
+      const publicKey = getPublicKey();
+      const res = await fetch('/api/admin-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'removeAdmin', targetId: id, keyHash, publicKey }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAdminAdminMsg(data.error || 'Failed to remove admin.');
+      } else {
+        setAdminAdminMsg('Admin removed successfully.');
+        await (window as unknown as { loadAdmins: () => void }).loadAdmins();
+      }
     } catch {
-      setAdminAdminMsg("Unexpected error removing admin.");
+      setAdminAdminMsg('Unexpected error removing admin.');
     }
   };
 
