@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import AnimatedEquation from "./AnimatedEquation";
 import ProgressBar from "./ui/ProgressBar";
 import ProofTimer from "./ProofTimer";
+import { format } from 'date-fns';
 
 interface VerifyModalProps {
   isOpen: boolean;
@@ -29,7 +30,10 @@ export function VerifyModal({
   if (!isOpen || !request) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white  shadow-lg p-6 w-full max-w-md border-2 border-gray-300">
+      <div
+        className="bg-white shadow-lg p-6 w-full max-w-md border-2 border-gray-300"
+        style={{ maxHeight: '80vh', overflowY: 'auto' }}
+      >
         <h2 className="text-xl font-bold mb-4">View and Verify Idea</h2>
         {/* Show request info */}
         <div className="mb-2">
@@ -183,6 +187,13 @@ export function VerifyModal({
           )}
           <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
+        {request && (
+          <div style={{ marginTop: 8, marginBottom: 8 }}>
+            <span style={{ color: '#888', fontSize: '12px', fontStyle: 'italic' }}>
+              Submitted: {format(new Date(request.created_at), 'PPP, p')}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

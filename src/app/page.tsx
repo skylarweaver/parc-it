@@ -53,6 +53,8 @@ export default function Home() {
   const [signupSuccess, setSignupSuccess] = React.useState(false);
   const [signupAlreadySignedUp, setSignupAlreadySignedUp] = React.useState(false);
   const [signupPrefillKey, setSignupPrefillKey] = React.useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = React.useState<'date' | 'upvotes'>('date');
+  const [dateFilter, setDateFilter] = React.useState<'all' | 'week' | 'twoweeks' | 'month'>('all');
 
   const handleLogin = async (key: string, pubKey: string) => {
     setIsAdmin(false);
@@ -300,6 +302,36 @@ export default function Home() {
     }
   }, [signupOpen]);
 
+  // Compute filtered and sorted requests
+  const filteredRequests = React.useMemo(() => {
+    if (dateFilter === 'all') return requests;
+    const now = new Date();
+    let cutoff: Date;
+    if (dateFilter === 'week') {
+      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (dateFilter === 'twoweeks') {
+      cutoff = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    } else if (dateFilter === 'month') {
+      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      cutoff = new Date(0);
+    }
+    return requests.filter(r => new Date(r.created_at) >= cutoff);
+  }, [requests, dateFilter]);
+
+  const sortedRequests = React.useMemo(() => {
+    if (sortOrder === 'upvotes') {
+      return [...filteredRequests].sort((a, b) => {
+        const upA = upvoteCounts[a.id] || 0;
+        const upB = upvoteCounts[b.id] || 0;
+        if (upB !== upA) return upB - upA;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    } else {
+      return [...filteredRequests].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+  }, [filteredRequests, upvoteCounts, sortOrder]);
+
   return (
     <div className="retro-container">
       <div style={{ width: '100%' }}>
@@ -345,7 +377,7 @@ export default function Home() {
               <div className="text-gray-500">No requests yet.</div>
             ) : (
               <RequestFeed
-                requests={requests}
+                requests={sortedRequests}
                 members={members}
                 upvoteCounts={upvoteCounts}
                 loggedIn={loggedIn}
@@ -363,6 +395,10 @@ export default function Home() {
                 userPubKey={userPubKey}
                 fetchUpvoteCounts={fetchUpvoteCounts}
                 upvotersByRequest={upvotersByRequest}
+                sortOrder={sortOrder}
+                setSortOrder={setSortOrder}
+                dateFilter={dateFilter}
+                setDateFilter={setDateFilter}
               />
             )}
           </div>
