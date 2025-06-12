@@ -1,6 +1,7 @@
 import React from "react";
 import { OfficeRequest, GroupMember } from "../types/models";
 import { Button } from "./ui/button";
+import { formatDistanceToNow } from 'date-fns';
 
 interface RequestFeedProps {
   requests: OfficeRequest[];
@@ -37,6 +38,10 @@ interface RequestFeedProps {
   userPubKey: string | null;
   fetchUpvoteCounts: (ids: string[]) => void;
   upvotersByRequest: { [requestId: string]: string[] };
+  sortOrder: 'date' | 'upvotes';
+  setSortOrder: (order: 'date' | 'upvotes') => void;
+  dateFilter: 'all' | 'week' | 'twoweeks' | 'month';
+  setDateFilter: (filter: 'all' | 'week' | 'twoweeks' | 'month') => void;
 }
 
 function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, submitUpvote, unUpvote, handleOpenVerify, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest, allRequestIds }: {
@@ -102,7 +107,12 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
         {/* Upvote message area (success/error) */}
       </div>
       <div className="flex items-center justify-between mt-2">
-        <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>View Details</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="ml-2" onClick={() => handleOpenVerify(req)}>View Details</Button>
+          <span style={{ color: '#888', fontSize: '11px', fontStyle: 'italic', marginLeft: 8 }}>
+            {formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}
+          </span>
+        </div>
         <div className="flex flex-row-reverse items-center gap-2">
           <span className="retro-upvote-count ml-2 px-2 py-1 shadow border border-purple-300 font-mono text-xs" style={{ color: '#7c3aed', fontSize: '9px' }}>
             {upvoteCounts[req.id] || 0} {upvoteCounts[req.id] === 1 ? 'upvote' : 'upvotes'}
@@ -131,11 +141,44 @@ function RequestCard({ req, members, loggedIn, upvoteCounts, upvoteLoading, subm
   );
 }
 
-export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, unUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest }: RequestFeedProps) {
+export function RequestFeed({ requests, members, upvoteCounts, loggedIn, upvoteLoading, submitUpvote, unUpvote, handleOpenVerify, currentPage, pageSize, totalRequests, setCurrentPage, fetchRequests, upvoteMsg, parcItKey, userPubKey, fetchUpvoteCounts, upvotersByRequest, sortOrder, setSortOrder, dateFilter, setDateFilter }: RequestFeedProps) {
   const allRequestIds = requests.map(r => r.id);
   return (
     <div className="w-full max-w-xl mb-20">
       <div className="flex items-center justify-between mb-4">
+        {/* Sorting and Filtering Controls */}
+        <div className="flex items-center gap-4">
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="sortOrder" className="font-mono text-xs text-gray-700">Sort by:</label>
+            <select
+              id="sortOrder"
+              value={sortOrder}
+              onChange={e => setSortOrder(e.target.value as 'date' | 'upvotes')}
+              className="retro-btn px-2 py-1 text-xs border border-gray-400 rounded"
+              style={{ minWidth: 110 }}
+            >
+              <option value="date">Newest</option>
+              <option value="upvotes">Most Upvoted</option>
+            </select>
+          </div>
+          {/* Date Filter Dropdown */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="dateFilter" className="font-mono text-xs text-gray-700">Date:</label>
+            <select
+              id="dateFilter"
+              value={dateFilter}
+              onChange={e => setDateFilter(e.target.value as 'all' | 'week' | 'twoweeks' | 'month')}
+              className="retro-btn px-2 py-1 text-xs border border-gray-400 rounded"
+              style={{ minWidth: 120 }}
+            >
+              <option value="all">All</option>
+              <option value="week">Last week</option>
+              <option value="twoweeks">Last two weeks</option>
+              <option value="month">Last month</option>
+            </select>
+          </div>
+        </div>
         {/* Add Request button is handled in parent */}
       </div>
       {requests.length === 0 ? (
