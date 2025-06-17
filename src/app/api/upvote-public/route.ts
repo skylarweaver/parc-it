@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { validateKeyHash } from '../../../helpers/utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 // New upvote-public route: upvotes by public key, no cryptographic proof required
 export async function POST(req: NextRequest) {
