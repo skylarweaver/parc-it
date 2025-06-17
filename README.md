@@ -17,7 +17,7 @@ Parc-It! is an anonymous office request board for the 0xPARC office. The goal is
 
 ---
 
-## Privacy-Preserving Login & Authentication (2024 Update)
+## Privacy-Preserving Login & Authentication
 
 ### Motivation
 Parc-It! is designed to maximize privacy for group members. The goal is to allow users to prove group membership and submit requests **without revealing their identity** to the server or other users, unless they explicitly choose to doxx themselves. We avoid traditional authentication (OAuth, passwords, cookies) and instead use cryptographic group signatures and a hashed key system.
